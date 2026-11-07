@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gate Roster Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,62..125,500..900&family=Noto+Sans+Gujarati:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one column of three plain steps (days, gates, download) with a scaled preview of the pages underneath. The printed sheet is paper and keeps its own fixed colors in both themes. */
+:root{
+  --bg:#F6F6F3; --fg:#1A1D22; --mute:#5A6068; --line:#D9D8D1; --card:#FFFFFF;
+  --accent:#1F3A5F; --on-accent:#FFFFFF; --tint:#E7EDF5; --warn:#9A3412; --ok:#166534;
+  --display:'Archivo','Arial Narrow',Arial,sans-serif; --body:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13161A; --fg:#ECEBE6; --mute:#9FA4AC; --line:#2E3239; --card:#1A1D22;
+  --accent:#8FB4E3; --on-accent:#10141A; --tint:#1A2431; --warn:#FDBA74; --ok:#86EFAC; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13161A; --fg:#ECEBE6; --mute:#9FA4AC; --line:#2E3239; --card:#1A1D22;
+  --accent:#8FB4E3; --on-accent:#10141A; --tint:#1A2431; --warn:#FDBA74; --ok:#86EFAC; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.5;
+  padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:22px 56px}
+main{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);font-weight:700}
+h1{font-family:var(--display);font-stretch:86%;font-weight:800;font-size:clamp(30px,8vw,44px);line-height:1.02;margin:6px 0 8px;color:var(--accent);text-wrap:balance}
+.lede{margin:0;color:var(--mute);max-width:60ch}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.step h2{margin:0;font-family:var(--display);font-stretch:92%;font-size:19px;font-weight:750;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.step h2 small{font-family:var(--body);font-weight:500;font-size:13px;color:var(--mute)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font:inherit;font-weight:650;font-size:14.5px;padding:9px 14px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.dates{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:440px){.dates{grid-template-columns:1fr}}
+.f{display:flex;flex-direction:column;gap:5px;min-width:0}
+label{font-weight:650;font-size:14px}
+input[type=date],select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px;width:100%;min-width:0}
+.gates{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:440px){.gates{grid-template-columns:1fr}}
+.g{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);cursor:pointer;font-weight:600}
+.g input{width:20px;height:20px;margin:1px 0 0;flex:none;accent-color:var(--accent)}
+.g small{display:block;font-weight:400;color:var(--mute);font-size:13px}
+.links{display:flex;gap:14px}
+.lk{font:inherit;font-size:14px;font-weight:650;background:none;border:0;padding:2px 0;color:var(--accent);cursor:pointer;text-decoration:underline}
+.sum{display:flex;flex-direction:column;gap:8px}
+.big{font-family:var(--display);font-stretch:90%;font-weight:800;font-size:22px}
+.heads{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.heads li{font-size:14px;padding:8px 10px;border-left:4px solid var(--accent);background:var(--tint);border-radius:0 6px 6px 0}
+.heads li.w{border-color:var(--warn)}
+.btn{font:inherit;font-weight:750;font-size:17px;border-radius:9px;padding:14px 18px;border:2px solid var(--accent);cursor:pointer;background:var(--accent);color:var(--on-accent);width:100%}
+.btn[disabled]{opacity:.55;cursor:default}
+.prog{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.prog>i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+.msg{margin:0;font-size:14px;color:var(--mute)}
+.msg.e{color:var(--warn);font-weight:650}
+.msg.o{color:var(--ok);font-weight:650}
+.prev{display:flex;flex-direction:column;gap:16px}
+.pv{display:flex;flex-direction:column;gap:6px}
+.pv>span{font-size:13px;color:var(--mute);font-weight:600}
+.pvw{overflow:hidden;border:1px solid var(--line);border-radius:4px;background:#fff;width:100%;max-width:340px}
+.pvi{transform-origin:top left}
+.rd{display:flex;flex-direction:column;gap:12px}
+.rd img{width:100%;max-width:420px;border:1px solid var(--line);border-radius:4px}
+
+/* ---- the printed sheet: fixed paper colors, same in both themes ---- */
+.sheet{--paper:#FFFFFF;--ink:#111111;--navy:#1F3A5F;--red:#B91C1C;
+  width:794px;height:1123px;background:var(--paper);color:var(--ink);position:relative;overflow:hidden;
+  font-family:'Archivo','Noto Sans Gujarati',Arial,sans-serif;padding:40px 46px 34px;display:flex;flex-direction:column;gap:14px}
+.sh{border-bottom:5px solid var(--navy);padding-bottom:10px;display:flex;flex-direction:column;gap:2px}
+.sh .t1{font-size:64px;font-weight:900;font-stretch:90%;line-height:1;color:var(--navy);text-transform:uppercase}
+.sh .t2{font-family:'Noto Sans Gujarati',sans-serif;font-size:42px;font-weight:800;line-height:1.25;color:var(--navy)}
+.sh .t3{font-size:23px;font-weight:700;color:#333}
+.sh .t3 span{font-family:'Noto Sans Gujarati',sans-serif;font-weight:700}
+.sd{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;background:#111;color:#fff;border-radius:8px;padding:8px 16px}
+.sd b{font-size:30px;font-weight:800;line-height:1.15}
+.sd i{font-style:normal;font-family:'Noto Sans Gujarati',sans-serif;font-size:26px;font-weight:700}
+.sd .pg{font-size:18px;font-weight:700;opacity:.85;white-space:nowrap}
+.sc{flex:1;min-height:0;display:flex;flex-direction:column;gap:.5em;overflow:hidden}
+.sec{border:3px solid var(--navy);border-radius:12px;padding:.45em .7em .55em}
+.sec.allow{background:#EAF1DD}.sec.info{background:#FFF2CC}.sec.warn{background:#FDE9D9;border-color:var(--red)}.sec.prog{background:#E4ECF7}
+.sec .st{font-size:.6em;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:var(--navy);line-height:1.2}
+.sec.warn .st{color:var(--red)}
+.sec .st span{font-family:'Noto Sans Gujarati',sans-serif;text-transform:none;letter-spacing:0;margin-left:.5em;font-weight:800}
+.it{margin-top:.45em;display:flex;flex-direction:column}
+.it .en{font-weight:800;font-size:1em;line-height:1.2}
+.it .gu{font-family:'Noto Sans Gujarati',sans-serif;font-weight:700;font-size:.9em;line-height:1.4}
+.it.red .en,.it.red .gu{color:var(--red)}
+.it .en:before{content:"\2022\00a0\00a0"}
+.tm{display:grid;grid-template-columns:1fr 1fr;gap:.5em;margin-top:.1em}
+.tm div{border:3px solid var(--red);border-radius:10px;background:#FDE9D9;padding:.3em .5em;text-align:center}
+.tm .h{font-size:.5em;font-weight:900;color:var(--red);text-transform:uppercase;line-height:1.25}
+.tm .h span{font-family:'Noto Sans Gujarati',sans-serif;text-transform:none;display:block}
+.tm .v{font-size:1.55em;font-weight:900;line-height:1.1;color:#111}
+.tm .vg{font-family:'Noto Sans Gujarati',sans-serif;font-size:1.2em;font-weight:800;line-height:1.3}
+.tm .nt{grid-column:1/-1;font-size:.5em;font-weight:800;border:0;background:none;padding:0;color:var(--red)}
+.sf{font-size:12px;color:#666;display:flex;justify-content:space-between}
+.stage{position:fixed;left:-12000px;top:0;width:794px}
+</style></head><body>
+<main>
+  <header>
+    <div class="eyebrow">Aljamea-tus-Saifiyah · Surveillance</div>
+    <h1>Gate Roster Desk</h1>
+    <p class="lede">Pick the days and the gates. Download one PDF of big-print rosters in English and Gujarati, ready to hand to each gate keeper.</p>
+  </header>
+
+  <p class="msg" id="upd"></p>
+  <section class="step" aria-labelledby="s1">
+    <h2 id="s1">1. Days <small id="rng"></small></h2>
+    <div class="chips" id="chips">
+      <button class="chip" type="button" data-k="t1">Tomorrow</button>
+      <button class="chip" type="button" data-k="t3">Next 3 days</button>
+      <button class="chip" type="button" data-k="t7">Next 7 days</button>
+    </div>
+    <div class="dates">
+      <div class="f"><label for="d1">From</label><input type="date" id="d1"></div>
+      <div class="f"><label for="d2">To</label><input type="date" id="d2"></div>
+    </div>
+    <p class="msg" id="dmsg">Up to 7 days at a time.</p>
+  </section>
+
+  <section class="step" aria-labelledby="s2">
+    <h2 id="s2">2. Gates <small id="gc"></small></h2>
+    <div class="links"><button class="lk" type="button" id="all">Select all</button><button class="lk" type="button" id="none">Clear</button></div>
+    <div class="gates" id="gates"></div>
+    <div class="f"><label for="ord">Order of pages</label>
+      <select id="ord"><option value="day">By day, then gate (hand out each morning)</option><option value="gate">By gate, then day</option></select></div>
+  </section>
+
+  <section class="step" aria-labelledby="s3">
+    <h2 id="s3">3. Download</h2>
+    <div class="sum">
+      <div class="big" id="cnt"></div>
+      <ul class="heads" id="heads"></ul>
+    </div>
+    <button class="btn" type="button" id="go">Download PDF</button>
+    <div class="prog" id="pbar" hidden><i id="pfill"></i></div>
+    <p class="msg" id="gmsg" role="status"></p>
+    <div class="rd" id="rd" hidden></div>
+  </section>
+
+  <section class="step" aria-labelledby="s4">
+    <h2 id="s4">Preview <small>Same pages as the PDF</small></h2>
+    <div class="prev" id="prev"></div>
+  </section>
+</main>
+<div class="stage" id="stage" aria-hidden="true"></div>
+
+<script src="config.js?v=1"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+/* data comes from config.js (edited by Claude each time instructions change) */
+var CFG=window.ROSTER_CONFIG||{};
+var G4_OVERRIDES=CFG.g4Overrides||[], PROGRAMS=CFG.programs||[], NOTES=CFG.notes||[];
+
+var G4_STD=CFG.g4Std||{ // 0=Sunday ... 6=Saturday: [entry closes, exit opens, gu entry, gu exit]
+  1:['8:35 AM','3:30 PM','8:35','3:30'],2:['8:35 AM','3:30 PM','8:35','3:30'],3:['8:35 AM','3:30 PM','8:35','3:30'],4:['8:35 AM','3:30 PM','8:35','3:30'],
+  5:['8:00 AM','3:30 PM','8:00','3:30'],6:['8:00 AM','1:45 PM','8:00','1:45']};
+var WD_EN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var WD_GU=['રવિવાર','સોમવાર','મંગળવાર','બુધવાર','ગુરુવાર','શુક્રવાર','શનિવાર'];
+var MO_EN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+var MO_GU=['જાન્યુઆરી','ફેબ્રુઆરી','માર્ચ','એપ્રિલ','મે','જૂન','જુલાઈ','ઑગસ્ટ','સપ્ટેમ્બર','ઑક્ટોબર','નવેમ્બર','ડિસેમ્બર'];
+
+/* shared lines [english, gujarati] */
+var MAT=['Taking material out: gate pass from the Store Manager. Gate keeper checks the material.','સામાન બહાર લઈ જવા સ્ટોર મેનેજરનો ગેટ પાસ જોઈએ. ગેટ કીપરે સામાન ચકાસવો.'];
+var NOSTU=['Students are NOT allowed to exit from this gate.','વિદ્યાર્થીઓને આ ગેટથી બહાર જવાની પરવાનગી નથી.'];
+var OPEN=['5:00 AM – Open the gate','સવારે 5:00 – ગેટ ખોલવો'];
+var CLOSE=['9:30 PM – Close the gate (on miqaat days the new time will be told)','રાત્રે 9:30 – ગેટ બંધ કરવો (મીકાતના દિવસોમાં નવો સમય જણાવાશે)'];
+var KEYS=['Before Tilawat ul Dua – Collect the room keys','તિલાવતુદ્દુઆ પહેલાં – રૂમની ચાવીઓ લેવી'];
+var PARCEL_M=['Parcels: receive ONLY at the Masakin counter. Write in the register. The talabat signs against the parcel when collecting.','પાર્સલ: ફક્ત મસાકીન કાઉન્ટર પર લેવા. રજિસ્ટરમાં નોંધ કરવી. લેતી વખતે તલબાતની સહી લેવી.'];
+var PARCEL_O=['Parcels: only at the Masakin counter. Not at this building.','પાર્સલ: ફક્ત મસાકીન કાઉન્ટર પર. આ બિલ્ડિંગમાં નહીં.'];
+var UNKNOWN=['Unknown people: NOT beyond the counter, unless Masakin Office or Siyanat Manager Office instructs.','અજાણ્યા લોકો: કાઉન્ટરથી આગળ નહીં, મસાકીન ઓફિસ અથવા સિયાનત મેનેજર ઓફિસની સૂચના હોય તો જ.'];
+var FACE=['Students entering after 9:30 PM MUST do the face scan. No face scan: do NOT let them in, even if Masakin Office allowed late entry.','રાત્રે 9:30 પછી આવતા વિદ્યાર્થીઓએ ફેસ સ્કેન કરવું ફરજિયાત છે. ફેસ સ્કેન વગર અંદર આવવા દેવા નહીં, મસાકીન ઓફિસે મોડા આવવાની પરવાનગી આપી હોય તો પણ.'];
+var NOFAM=['NO family or other people may meet the talabat.','પરિવાર કે અન્ય કોઈને તલબાતને મળવા દેવા નહીં.'];
+var NOPAR=['NO parcels or food deliveries to be collected.','કોઈ પાર્સલ કે ફૂડ ડિલિવરી લેવી નહીં.'];
+var ALLOW=['TODAY ONLY THESE PEOPLE ARE ALLOWED','આજે ફક્ત આ લોકોને જ પ્રવેશ આપવો'];
+var ALSO=['ALSO FOLLOW','આ પણ પાળવું'];
+var ALWAYS=['ALWAYS FOLLOW','હંમેશા પાળવાના નિયમો'];
+var DUTIES=['DAILY DUTIES','રોજના કામો'];
+var AFTER=['AFTER 9:30 PM','રાત્રે 9:30 પછી'];
+function S(kind,t,items){return {kind:kind,t:t,items:items}}
+function red(a){return {en:a[0],gu:a[1],red:1}}
+
+/* gate definitions: each returns an array of pages for a date */
+var GATES=[
+ {id:'g1',name:'Gate 1',sub:'Admin Building',fn:function(c){return [{t1:'GATE 1',t2:'ગેટ નંબર 1',secs:[].concat(prog(c,'g1'),[
+   S('allow',ALLOW,[['Aljamea KG','અલજામિયા KG'],['Azwaj Asateza','અઝવાજ અસાતેઝા'],['Visitors from outside Aljamea – entry in the register','અલજામિયા બહારના મુલાકાતીઓ – રજિસ્ટરમાં નોંધ સાથે']]),
+   S('info',ALSO,[['Write EVERY visitor entry in the entry register.','દરેક મુલાકાતીનો પ્રવેશ એન્ટ્રી રજિસ્ટરમાં નોંધવો.'],MAT,red(NOSTU)])])}]}},
+ {id:'g4',name:'Gate 4',sub:'Admin Building',fn:function(c){var t=g4(c);return [{t1:'GATE 4',t2:'ગેટ નંબર 4',secs:[].concat(prog(c,'g4'),[
+   S('allow',ALLOW,[['Talabat (students)','તલબાત (વિદ્યાર્થીઓ)'],['Crash Course students – with ID card issued by Tanzeem Office','ક્રેશ કોર્સના વિદ્યાર્થીઓ – તંઝીમ ઑફિસે આપેલા ID કાર્ડ સાથે'],['Office staff – with authorized ID card','ઑફિસ સ્ટાફ – માન્ય ID કાર્ડ સાથે'],['Hizb Khidmat Guzaar – with valid ID card','હિઝ્બ ખિદમત ગુઝાર – માન્ય ID કાર્ડ સાથે']]),
+   {kind:'tm',t:t},
+   S('info',ALSO,[['Students can exit ONLY from Gate 4.','વિદ્યાર્થીઓ ફક્ત ગેટ 4 પરથી જ બહાર જઈ શકશે.'],['Anyone else entering must show their ID card.','બીજા કોઈ પણ પ્રવેશ કરે તો ID કાર્ડ બતાવવું ફરજિયાત છે.'],
+     t.ok?['Leaving before '+t.exit+': show the gate pass. Gate keeper collects it.',t.exitGu+' પહેલાં બહાર જવું હોય તો ગેટ પાસ બતાવવો. ગેટ કીપરે પાસ લઈ લેવો.']:['Leaving early: show the gate pass. Gate keeper collects it.','વહેલા બહાર જવું હોય તો ગેટ પાસ બતાવવો. ગેટ કીપરે પાસ લઈ લેવો.'],MAT])])}]}},
+ {id:'g6',name:'Gate 6',sub:'Rabvat Gate',fn:function(c){return [{t1:'GATE 6',t2:'ગેટ નંબર 6',sub:['Rabvat Gate (Rabvat Jiblah)','રબ્વત ગેટ (રબ્વત જિબ્લાહ)'],secs:[].concat(prog(c,'g6'),[
+   S('allow',ALLOW,[['Momenaat Bairaao visiting Rabvat Jiblah – 2 slots every week, about 30 in each slot','રબ્વત જિબ્લાહ આવતી મોમીનાત બૈરાઓ – દર અઠવાડિયે 2 સ્લોટ, દરેક સ્લોટમાં આશરે 30'],['Slot timing: to be confirmed','સ્લોટનો સમય: હજી નક્કી થવાનો છે']]),
+   S('info',['ENTRY','પ્રવેશ'],[['A BGI member will be at the gate. The BGI member receives the group and authorises access.','ગેટ પર BGI સભ્ય હશે. BGI સભ્ય જૂથને સ્વીકારશે અને પ્રવેશ મંજૂર કરશે.'],red(['Do NOT let anyone in for this visit unless the BGI member authorises.','BGI સભ્ય મંજૂરી આપે નહીં ત્યાં સુધી આ મુલાકાત માટે કોઈને અંદર આવવા દેવા નહીં.']),MAT])])}]}},
+ {id:'g8',name:'Gate 8',sub:'Admin Building',fn:function(c){return [{t1:'GATE 8',t2:'ગેટ નંબર 8',secs:[].concat(prog(c,'g8'),[
+   S('allow',ALLOW,[['Support staff (peons, technicians, other staff) – with authorized Aljamea ID card','સપોર્ટ સ્ટાફ (પ્યુન, ટેકનિશિયન, અન્ય સ્ટાફ) – અલજામિયાના માન્ય ID કાર્ડ સાથે'],['People with a Gate 8 pass issued by Tanzeem Office','તંઝીમ ઑફિસે ગેટ 8 નો પાસ આપ્યો હોય તેવા લોકો']]),
+   S('info',ALSO,[['On entry, check any staff suspected of carrying gutka. They must cooperate.','પ્રવેશ સમયે ગુટખા રાખવાની શંકા હોય તેવા સ્ટાફની તપાસ કરવી. તેમણે સહકાર આપવો.'],MAT,red(NOSTU)])])}]}},
+ {id:'m7',name:'Gates 7A & 7B',sub:'Mahad al-Zahra',fn:function(c){return [{t1:'GATE 7A & 7B',t2:'ગેટ 7A અને 7B',sub:['Mahad al-Zahra','મહદ અલ-ઝહરા'],secs:[].concat(prog(c,'m7'),[
+   S('allow',['GATE 7A – ALLOWED','ગેટ 7A – પ્રવેશ માટે'],[['Aljamea / Attalimiyah KG (Khidmat Guzaar) – 7:00 AM to 9:00 PM','અલજામિયા / અત્તાલીમિયા KG (ખિદમત ગુઝાર) – સવારે 7:00 થી રાત્રે 9:00'],['Staff – 8:30 AM to 7:00 PM','સ્ટાફ – સવારે 8:30 થી સાંજે 7:00'],['Peons – 8:00 AM to 7:00 PM','પ્યુન – સવારે 8:00 થી સાંજે 7:00'],['Mukhaiyam female students and Atfaal (Mahad children) – on occasions only','મુખૈયમ વિદ્યાર્થિનીઓ અને અત્ફાલ (મહાદના બાળકો) – ફક્ત પ્રસંગોએ'],['Guests are NOT allowed without a card.','કાર્ડ વગર મહેમાનોને પ્રવેશ આપવો નહીં.']]),
+   S('info',['GATE 7B – ALLOWED','ગેટ 7B – પ્રવેશ માટે'],[['Talabat / Taalebaat – 10:30 AM to 12:30 PM and 4:30 PM to 6:00 PM','તલબાત / તાલેબાત – સવારે 10:30 થી બપોરે 12:30 અને સાંજે 4:30 થી 6:00'],['Open Gate 7B ONLY during these times, then lock it again.','ગેટ 7B ફક્ત આ સમયે જ ખોલવો, પછી ફરીથી તાળું મારવું.']])])}]}},
+ {id:'mf',name:'Masakin front gate',sub:'Boys Hostel',fn:function(c){var h=['MASAKIN MOHAMMEDIYAH','મસાકીન મોહમ્મદીયા'],s=['FRONT GATE  •  Boys Hostel','ફ્રન્ટ ગેટ  •  બોયઝ હોસ્ટેલ'];return [
+   {t1:h[0],t2:h[1],sub:s,secs:[].concat(prog(c,'mf'),[S('allow',DUTIES,[['4:30 AM – Turn on the lights','સવારે 4:30 – લાઇટ ચાલુ કરવી'],OPEN,KEYS,CLOSE,['10:30 PM – Turn off the lights from the main switch','રાત્રે 10:30 – મુખ્ય સ્વિચથી લાઇટ બંધ કરવી']])])},
+   {t1:h[0],t2:h[1],sub:s,secs:[S('info',ALWAYS,[PARCEL_M,['Parents sit ONLY in the Foyer.','વાલીઓ ફક્ત ફોયરમાં બેસે.'],UNKNOWN]),S('warn',AFTER,[FACE,NOFAM,NOPAR])]}]}},
+ {id:'mb',name:'Masakin back gate',sub:'Boys Hostel',fn:function(c){var h=['MASAKIN MOHAMMEDIYAH','મસાકીન મોહમ્મદીયા'],s=['BACK GATE  •  Boys Hostel','પાછળનો ગેટ  •  બોયઝ હોસ્ટેલ'];return [
+   {t1:h[0],t2:h[1],sub:s,secs:[].concat(prog(c,'mb'),[S('allow',DUTIES,[OPEN,CLOSE]),S('info',ALWAYS,[PARCEL_M,['Parents sit ONLY in the Foyer.','વાલીઓ ફક્ત ફોયરમાં બેસે.'],UNKNOWN])])},
+   {t1:h[0],t2:h[1],sub:s,secs:[S('warn',AFTER,[['Talabat who try to enter from the back gate: tell them to use the FRONT gate.','પાછળના ગેટથી અંદર આવવા માંગતા તલબાતને ફ્રન્ટ ગેટથી આવવા કહેવું.'],['NO student may exit from the back gate at any cost, unless Masakin Office confirms by voice.','કોઈ પણ સંજોગોમાં વિદ્યાર્થીને પાછળના ગેટથી બહાર જવા દેવો નહીં, મસાકીન ઓફિસ બોલીને પરવાનગી આપે તો જ.'],NOFAM,NOPAR])]}]}},
+ {id:'rm',name:'Raj Manzil',sub:'Boys Hostel',fn:function(c){var h=['RAJ MANZIL','રાજ મંઝિલ'],s=['Boys Hostel','બોયઝ હોસ્ટેલ'];return [
+   {t1:h[0],t2:h[1],sub:s,secs:[].concat(prog(c,'rm'),[S('allow',DUTIES,[OPEN,CLOSE,PARCEL_O,['Parents sit ONLY in the waiting area near the counter.','વાલીઓ ફક્ત કાઉન્ટર પાસેના વેઇટિંગ એરિયામાં બેસે.'],UNKNOWN])])},
+   {t1:h[0],t2:h[1],sub:s,secs:[S('warn',AFTER,[FACE,NOFAM,NOPAR])]}]}},
+ {id:'ys',name:'Yusufi gate',sub:'Boys Hostel',fn:function(c){var h=['YUSUFI MAKAAN','યુસુફી મકાન'],s=['Boys Hostel','બોયઝ હોસ્ટેલ'];return [
+   {t1:h[0],t2:h[1],sub:s,secs:[].concat(prog(c,'ys'),[S('allow',DUTIES,[OPEN,KEYS,CLOSE,PARCEL_O,['Parents: there is NO waiting area here.','વાલીઓ માટે અહીં વેઇટિંગ એરિયા નથી.'],UNKNOWN])])},
+   {t1:h[0],t2:h[1],sub:s,secs:[S('warn',AFTER,[FACE,NOFAM,NOPAR])]}]}}
+];
+
+/* ---- helpers ---- */
+function iso(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+function parse(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2],12,0,0)}
+function addDays(d,n){var x=new Date(d.getTime());x.setDate(x.getDate()+n);return x}
+function fmtEn(d){return WD_EN[d.getDay()]+', '+d.getDate()+' '+MO_EN[d.getMonth()]+' '+d.getFullYear()}
+function fmtGu(d){return WD_GU[d.getDay()]+', '+d.getDate()+' '+MO_GU[d.getMonth()]+' '+d.getFullYear()}
+function short(d){return WD_EN[d.getDay()].slice(0,3)+' '+d.getDate()+' '+MO_EN[d.getMonth()].slice(0,3)}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function ctx(d){return {d:d,iso:iso(d)}}
+function g4(c){
+  var o=null;G4_OVERRIDES.forEach(function(x){if(c.iso>=x.from&&c.iso<=x.to)o=x});
+  if(o)return {ok:1,entry:o.entry,exit:o.exit,entryGu:o.entryGu,exitGu:o.exitGu,noteEn:o.noteEn,noteGu:o.noteGu};
+  var s=G4_STD[c.d.getDay()];
+  if(!s)return {ok:0,noteEn:'No standard Gate 4 timing is set for Sunday. Confirm with Tanzeem Office.',noteGu:'રવિવાર માટે ગેટ 4 નો સમય નક્કી નથી. તંઝીમ ઑફિસ પાસેથી ખાતરી કરવી.'};
+  return {ok:1,entry:s[0],exit:s[1],entryGu:s[2],exitGu:s[3]};
+}
+function progsFor(c,gate){return PROGRAMS.filter(function(p){return p.gate===gate&&c.iso>=p.from&&c.iso<=p.to})}
+function notesFor(c,gate){return NOTES.filter(function(n){return c.iso>=n.from&&c.iso<=n.to&&(n.gates==='all'||n.gates.indexOf(gate)>-1)})}
+function prog(c,gate){
+  var nt=notesFor(c,gate);
+  var ns=nt.length?[S('warn',['NEW INSTRUCTION','નવી સૂચના'],nt.map(function(n){return {en:n.en,gu:n.gu,red:1}}))]:[];
+  return ns.concat(progsFor(c,gate).map(function(p){
+    var it=[[p.en,p.gu],['Time: '+p.time[0]+'  •  '+p.gateName[0]+'  •  '+p.people[0],'સમય: '+p.time[1]+'  •  '+p.gateName[1]+'  •  '+p.people[1]],['Entry pass: '+p.pass[0],'પ્રવેશ પાસ: '+p.pass[1]]];
+    if(p.recv)it.push(['Received and authorised by: '+p.recv[0],'સ્વીકારનાર અને મંજૂર કરનાર: '+p.recv[1]]);
+    return S('prog',['TODAY’S PROGRAM','આજનો કાર્યક્રમ'],it);
+  }));
+}
+function itemHtml(x){
+  var a=Array.isArray(x)?{en:x[0],gu:x[1]}:x;
+  return '<div class="it'+(a.red?' red':'')+'"><div class="en">'+esc(a.en)+'</div><div class="gu">'+esc(a.gu)+'</div></div>';
+}
+function secHtml(s){
+  if(s.kind==='tm'){
+    var t=s.t;
+    if(!t.ok)return '<div class="sec warn"><div class="st">GATE 4 TIMINGS <span>ગેટ 4 નો સમય</span></div>'+itemHtml([t.noteEn,t.noteGu])+'</div>';
+    return '<div class="tm"><div><div class="h">Entry closes (for students)<span>પ્રવેશ બંધ (વિદ્યાર્થીઓ માટે)</span></div><div class="v">after '+esc(t.entry)+'</div><div class="vg">સવારે '+esc(t.entryGu)+' પછી</div></div>'+
+      '<div><div class="h">Exit opens (for students)<span>બહાર નીકળવું શરૂ (વિદ્યાર્થીઓ માટે)</span></div><div class="v">'+esc(t.exit)+'</div><div class="vg">બપોરે '+esc(t.exitGu)+' થી</div></div>'+
+      (t.noteEn?'<div class="nt">'+esc(t.noteEn)+' · '+esc(t.noteGu)+'</div>':'')+'</div>';
+  }
+  return '<div class="sec '+s.kind+'"><div class="st">'+esc(s.t[0])+'<span>'+esc(s.t[1])+'</span></div>'+s.items.map(itemHtml).join('')+'</div>';
+}
+function buildAll(days,gateIds,order){
+  var pages=[];
+  days.forEach(function(d,di){gateIds.forEach(function(gid,gi){
+    var g=GATES.filter(function(x){return x.id===gid})[0];
+    var ps=g.fn(ctx(d));
+    ps.forEach(function(p,pi){pages.push({day:d,gate:g,page:p,n:pi+1,of:ps.length,key:iso(d)+'|'+gid+'|'+pi,di:di,gi:gi})});
+  })});
+  if(order==='gate')pages.sort(function(a,b){return a.gi-b.gi||a.di-b.di||a.n-b.n});
+  return pages;
+}
+function sheetEl(pg,base){
+  var p=pg.page,el=document.createElement('div');el.className='sheet';
+  var sub=p.sub?'<div class="t3">'+esc(p.sub[0])+' <span>'+esc(p.sub[1])+'</span></div>':'';
+  el.innerHTML='<div class="sh"><div class="t1">'+esc(p.t1)+'</div><div class="t2">'+esc(p.t2)+'</div>'+sub+'</div>'+
+    '<div class="sd"><div><b>'+esc(fmtEn(pg.day))+'</b></div><i>'+esc(fmtGu(pg.day))+'</i>'+(pg.of>1?'<span class="pg">'+pg.n+' / '+pg.of+'</span>':'')+'</div>'+
+    '<div class="sc">'+p.secs.map(secHtml).join('')+'</div><div class="sf"><span>Aljamea-tus-Saifiyah · Gate roster · Instructions as of '+esc(CFG.updated||'standard')+'</span><span>'+esc(pg.gate.name)+'</span></div>';
+  el.querySelector('.sc').style.fontSize=base+'px';
+  return el;
+}
+var FIT={};
+function fit(el,key){
+  var sc=el.querySelector('.sc'),b=36;
+  for(;b>12;b--){sc.style.fontSize=b+'px';if(sc.scrollHeight<=sc.clientHeight+1)break}
+  FIT[key]=b;return b;
+}
+
+/* ---- UI state ---- */
+var $=function(i){return document.getElementById(i)};
+var sel={};GATES.forEach(function(g){sel[g.id]=true});
+function days(){
+  var a=$('d1').value,b=$('d2').value;if(!a||!b)return [];
+  var x=parse(a),y=parse(b),out=[];if(y<x)return [];
+  while(x<=y&&out.length<7){out.push(x);x=addDays(x,1)}return out;
+}
+function chk(){
+  var a=$('d1').value,b=$('d2').value,m=$('dmsg');m.className='msg';
+  if(!a||!b){m.textContent='Choose both dates.';m.className='msg e';return false}
+  var x=parse(a),y=parse(b);
+  if(y<x){m.textContent='The last day is before the first day. Change one of them.';m.className='msg e';return false}
+  var n=Math.round((y-x)/864e5)+1;
+  if(n>7){m.textContent='That is '+n+' days. Only the first 7 will be used.'}else m.textContent=n+(n===1?' day':' days')+' selected.';
+  return true;
+}
+function setRange(n){var t=addDays(new Date(),1);$('d1').value=iso(t);$('d2').value=iso(addDays(t,n-1))}
+function chips(k){[].forEach.call(document.querySelectorAll('.chip'),function(c){c.setAttribute('aria-pressed',c.dataset.k===k?'true':'false')})}
+function draw(){
+  var ok=chk(),ds=ok?days():[],ids=GATES.filter(function(g){return sel[g.id]}).map(function(g){return g.id});
+  $('gc').textContent=ids.length+' of '+GATES.length+' selected';
+  $('rng').textContent=ds.length?(ds.length===1?short(ds[0]):short(ds[0])+' to '+short(ds[ds.length-1])):'';
+  var pages=buildAll(ds,ids,$('ord').value);
+  $('cnt').textContent=pages.length?(pages.length+(pages.length===1?' page':' pages')+' · '+ds.length+(ds.length===1?' day':' days')+' · '+ids.length+(ids.length===1?' gate':' gates')):'Nothing to download yet';
+  $('go').disabled=!pages.length;
+  var h=[];
+  ds.forEach(function(d){
+    var c=ctx(d),o=null;G4_OVERRIDES.forEach(function(x){if(c.iso>=x.from&&c.iso<=x.to)o=x});
+    if(o&&sel.g4)h.push(['Gate 4 on '+short(d)+': entry closes '+o.entry+', exit opens '+o.exit+' ('+o.noteEn+')',0]);
+    if(d.getDay()===0&&sel.g4)h.push(['Gate 4 on '+short(d)+' (Sunday): no standard timing is set. The page asks the gate keeper to confirm with Tanzeem Office.',1]);
+    GATES.forEach(function(g){if(sel[g.id])notesFor(c,g.id).forEach(function(n){h.push([g.name+' on '+short(d)+': NEW INSTRUCTION: '+n.en,1])});if(sel[g.id])progsFor(c,g.id).forEach(function(p){h.push([g.name+' on '+short(d)+': '+p.en+', '+p.time[0],0])})});
+  });
+  $('heads').innerHTML=h.map(function(x){return '<li'+(x[1]?' class="w"':'')+'>'+esc(x[0])+'</li>'}).join('');
+  $('heads').hidden=!h.length;
+  // preview
+  var pv=$('prev');pv.innerHTML='';
+  if(!pages.length){pv.innerHTML='<p class="msg">Pick at least one day and one gate to see the pages.</p>';return pages}
+  var W=340,scale=W/794;
+  pages.forEach(function(pg){
+    var box=document.createElement('div');box.className='pv';
+    var lab=document.createElement('span');lab.textContent=short(pg.day)+' · '+pg.gate.name+(pg.of>1?' · page '+pg.n+' of '+pg.of:'');
+    var w=document.createElement('div');w.className='pvw';w.style.width=W+'px';w.style.height=Math.round(1123*scale)+'px';w.style.maxWidth='100%';
+    var inner=document.createElement('div');inner.className='pvi';inner.style.width='794px';inner.style.height='1123px';
+    var el=sheetEl(pg,30);inner.appendChild(el);w.appendChild(inner);box.appendChild(lab);box.appendChild(w);pv.appendChild(box);
+    fit(el,pg.key);
+    inner.style.transform='scale('+scale+')';
+  });
+  // keep the preview narrower on small screens
+  [].forEach.call(document.querySelectorAll('.pvw'),function(w){
+    var cw=w.parentElement.clientWidth,s=Math.min(W,cw)/794;
+    w.style.height=Math.round(1123*s)+'px';w.firstChild.style.transform='scale('+s+')';
+  });
+  return pages;
+}
+
+/* ---- PDF ---- */
+function wait(ms){return new Promise(function(r){setTimeout(r,ms)})}
+async function make(){
+  var gm=$('gmsg'),go=$('go'),pb=$('pbar'),pf=$('pfill'),rd=$('rd');
+  gm.className='msg';gm.textContent='';rd.hidden=true;rd.innerHTML='';
+  var ds=days(),ids=GATES.filter(function(g){return sel[g.id]}).map(function(g){return g.id});
+  var pages=buildAll(ds,ids,$('ord').value);
+  if(!pages.length||!window.html2canvas||!window.jspdf){gm.className='msg e';gm.textContent='The PDF tools did not load. Check your connection and reload the page.';return}
+  go.disabled=true;pb.hidden=false;pf.style.width='0';
+  try{
+    try{await document.fonts.load('800 30px "Archivo"','A');await document.fonts.load('800 30px "Noto Sans Gujarati"','અ');await document.fonts.ready}catch(e){}
+    var stage=$('stage');stage.innerHTML='';
+    var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'}),imgs=[];
+    for(var i=0;i<pages.length;i++){
+      gm.textContent='Making page '+(i+1)+' of '+pages.length+'…';
+      var el=sheetEl(pages[i],FIT[pages[i].key]||24);stage.innerHTML='';stage.appendChild(el);
+      await wait(30);
+      var cv=await window.html2canvas(el,{scale:1.7,backgroundColor:'#ffffff',logging:false,width:794,height:1123,windowWidth:794});
+      var im=cv.toDataURL('image/jpeg',0.86);imgs.push(im);
+      if(i)pdf.addPage();
+      pdf.addImage(im,'JPEG',0,0,210,297,undefined,'FAST');
+      pf.style.width=Math.round((i+1)/pages.length*100)+'%';
+    }
+    stage.innerHTML='';
+    var blob=pdf.output('blob');
+    var name='Gate_Rosters_'+iso(ds[0])+(ds.length>1?'_to_'+iso(ds[ds.length-1]):'')+'.pdf';
+    var saved=false,why='';
+    try{
+      var u=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=u;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(u)},60000);saved=true;
+    }catch(e){why='The download did not start.'}
+    if(saved){gm.className='msg o';gm.textContent='Downloaded '+name+' ('+pages.length+' pages). Check your Downloads folder.'}
+    else{
+      gm.className='msg e';gm.textContent=why+' The pages are shown below. Press and hold a page to save it as an image.';
+      rd.hidden=false;rd.innerHTML=imgs.map(function(s,k){return '<img alt="Roster page '+(k+1)+'" src="'+s+'">'}).join('');
+    }
+  }catch(e){
+    gm.className='msg e';gm.textContent='Could not make the PDF. Try fewer days or gates, then try again.';
+  }
+  go.disabled=false;pb.hidden=true;
+}
+
+/* ---- wire up ---- */
+var gl=$('gates');
+GATES.forEach(function(g){
+  var l=document.createElement('label');l.className='g';
+  l.innerHTML='<input type="checkbox" id="g_'+g.id+'" checked><span>'+esc(g.name)+'<small>'+esc(g.sub)+'</small></span>';
+  l.querySelector('input').addEventListener('change',function(){sel[g.id]=this.checked;draw()});
+  gl.appendChild(l);
+});
+$('all').addEventListener('click',function(){GATES.forEach(function(g){sel[g.id]=true;$('g_'+g.id).checked=true});draw()});
+$('none').addEventListener('click',function(){GATES.forEach(function(g){sel[g.id]=false;$('g_'+g.id).checked=false});draw()});
+[].forEach.call(document.querySelectorAll('.chip'),function(c){c.addEventListener('click',function(){setRange(c.dataset.k==='t1'?1:c.dataset.k==='t3'?3:7);chips(c.dataset.k);draw()})});
+$('d1').addEventListener('change',function(){chips('');if($('d2').value<$('d1').value)$('d2').value=$('d1').value;draw()});
+$('d2').addEventListener('change',function(){chips('');draw()});
+$('ord').addEventListener('change',draw);
+$('go').addEventListener('click',make);
+$('upd').textContent=CFG.updated?'Timings and instructions last updated: '+CFG.updated:'Using standard timings. No special instructions loaded.';
+setRange(1);chips('t1');
+var ready=function(){draw()};
+if(document.fonts&&document.fonts.load){Promise.all([document.fonts.load('800 30px "Archivo"','A'),document.fonts.load('800 30px "Noto Sans Gujarati"','અ')]).then(ready,ready);draw()}else draw();
+</script>
+</body></html>
