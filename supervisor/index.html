@@ -353,7 +353,31 @@ function rosterCard(){
   t.progs.forEach(function(p){h+='<div><span class="chip yel">Program</span> '+esc(p.gate)+': '+esc(p.en)+' · '+esc(p.time)+' · '+esc(p.people)+' · '+esc(p.pass)+'</div>'});
   t.notes.forEach(function(n){h+='<div class="flag" style="margin-top:2px"><b>NEW INSTRUCTION</b> ('+esc(n.gates)+'): '+esc(n.en)+'</div>'});
   if(!t.progs.length&&!t.notes.length)h+='<div class="muted">No special programs or new instructions today.</div>';
-  return h+'<div class="muted">Roster updated: '+esc(t.updated||'standard')+'</div></div>'}
+  return h+'<div id="gi" class="muted">Loading instructions for every gate…</div><div class="muted">Roster updated: '+esc(t.updated||'standard')+'</div></div>'}
+function fillGateInstr(){
+  var box=$('#gi');if(!box)return;
+  var f=document.createElement('iframe');f.style.cssText='position:absolute;left:-9999px;width:800px;height:600px;border:0';f.setAttribute('aria-hidden','true');f.src='../index.html?v='+Date.now();
+  var tries=0,tm=setInterval(function(){
+    var w=f.contentWindow;tries++;
+    if(w&&w.GATES&&w.buildAll&&w.document.readyState!=='loading'){
+      clearInterval(tm);
+      try{
+        var pages=w.buildAll([new Date()],w.GATES.map(function(g){return g.id}),'day'),h='',seen={};
+        pages.forEach(function(pg){
+          var key=pg.gate.name+pg.page.t1;if(seen[key])return;seen[key]=1;
+          var inner='';
+          pg.page.secs.forEach(function(sc){
+            if(sc.kind==='tm'){var t=sc.t;inner+=t.ok?'<div><span class="chip">Gate 4</span> Entry closes <b>'+esc(t.entry)+'</b> · Exit opens <b>'+esc(t.exit)+'</b></div>':'<div class="muted">'+esc(t.noteEn||'')+'</div>';return}
+            inner+='<div style="margin-top:8px"><div class="muted" style="font-weight:800;text-transform:uppercase;font-size:12px">'+esc(sc.t[0])+'</div>'+sc.items.map(function(x){var a=Array.isArray(x)?{en:x[0]}:x;return '<div style="'+(a.red?'color:var(--red);font-weight:700':'')+'">• '+esc(a.en)+'</div>'}).join('')+'</div>'});
+          h+='<details style="border-top:1px solid var(--line);padding:8px 0"><summary style="font-weight:800;cursor:pointer">'+esc(pg.gate.name)+(pg.page.sub?' <span class="muted" style="font-weight:500">'+esc(pg.page.sub[0])+'</span>':'')+'</summary>'+inner+'</details>'});
+        box.className='';box.innerHTML='<div style="font-weight:800;margin-top:4px">Gate by gate, today</div>'+h;
+      }catch(e){box.textContent='Open the Roster tab to see every gate.'}
+      setTimeout(function(){f.remove()},50);
+    }else if(tries>40){clearInterval(tm);box.textContent='Open the Roster tab to see every gate.';f.remove()}
+  },250);
+  document.body.appendChild(f);
+}
+
 function tile(label,val,cls){return '<div class="card" style="flex:1;min-width:130px;gap:2px"><div class="muted">'+esc(label)+'</div><div style="font-size:30px;font-weight:800;line-height:1.1" class="'+(cls||'')+'">'+val+'</div></div>'}
 function bars(items,cls){var m=Math.max.apply(null,items.map(function(i){return i[1]}).concat([1]));return items.map(function(i){return '<div style="display:flex;align-items:center;gap:8px"><span style="width:120px;font-size:13.5px">'+esc(i[0])+'</span><span style="flex:1;background:var(--line);border-radius:99px;height:10px;overflow:hidden"><span style="display:block;height:100%;width:'+Math.round(i[1]/m*100)+'%;background:var(--'+(cls||'navy')+')"></span></span><b style="width:26px;text-align:right">'+i[1]+'</b></div>'}).join('')}
 function covLine(label,n,total){var pc=total?Math.round(n/total*100):0;return '<div><div class="row" style="justify-content:space-between"><span>'+label+'</span><b>'+n+' of '+total+'</b></div><div style="background:var(--line);border-radius:99px;height:10px;overflow:hidden"><div style="height:100%;width:'+pc+'%;background:var(--'+(pc===100?'grn':'navy')+')"></div></div></div>'}
@@ -395,7 +419,7 @@ function viewHome(){
         '<div class="row"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>';
     }
     $('#hm').outerHTML='<div id="hm" style="display:flex;flex-direction:column;gap:12px">'+html+'</div>';
-    var root=$('#hm');goBtns(root);
+    var root=$('#hm');goBtns(root);fillGateInstr();
     [].forEach.call(root.querySelectorAll('[data-chk]'),function(b){b.onclick=function(){S.shift=sh;openCheck(b.dataset.chk)}});
   });
 }
