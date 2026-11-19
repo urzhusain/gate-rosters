@@ -99,6 +99,10 @@ function ageTxt(s){var h=ageH(s);if(h<1)return Math.max(1,Math.round(h*60))+' mi
 function ymd(offset){var d=new Date(Date.now()+5.5*36e5+offset*864e5);return d.toISOString().slice(0,10)}
 function defShift(){var h=new Date().getHours();return (h>=8&&h<20)?'Day':'Night'}
 function thumb(id,sz){return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w'+(sz||600)}
+function gInfo(id){return (S.guards||[]).filter(function(g){return g.id===id})[0]||{}}
+function phoneLinks(ph){var d=String(ph||'').replace(/\D/g,'');if(!d)return '<span class="muted">no number</span>';var n=d.length===10?'91'+d:d;return '<a href="tel:+'+n+'">📞 '+esc(ph)+'</a> · <a href="https://wa.me/'+n+'" target="_blank" rel="noopener">WhatsApp</a>'}
+function miniPh(id,sz){return id?'<a href="'+full(id)+'" target="_blank" rel="noopener"><img alt="" src="'+thumb(id,200)+'" style="width:'+(sz||56)+'px;height:'+(sz||56)+'px;object-fit:cover;border-radius:8px;border:1px solid var(--line);vertical-align:middle"></a>':''}
+function gx(c){var g=gInfo(c.guardId);return '<div style="display:flex;gap:8px;align-items:center;margin-top:4px">'+miniPh(c.photo||g.photo)+'<span style="font-size:13px">'+(g.phone?phoneLinks(g.phone):'')+'</span></div>'}
 function full(id){return 'https://drive.google.com/file/d/'+encodeURIComponent(id)+'/view'}
 function compress(file){return new Promise(function(res){
   if(!file)return res('');
@@ -135,7 +139,7 @@ function main(){
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
   $('#lo').onclick=logout;
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
-  var v={home:viewHome,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,roster:viewRoster}[S.tab];v();
+  var v={home:viewHome,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster}[S.tab];v();
 }
 
 /* ---------- round ---------- */
@@ -307,10 +311,27 @@ function viewToday(){
     var line=function(list){
       if(!list.length)return '<span class="chip yel">Not checked</span>';
       return list.map(function(c){var bad=/DOUBLE|ABSENT|NEW GUARD/.test(c.flags);
-        return '<div>'+'<span class="chip '+(c.presence==='Absent'?'red':c.presence==='Late'?'yel':'grn')+'">'+esc(c.presence)+'</span> '+esc(c.guard||'No guard')+(c.type!=='Regular'?' <span class="muted">· '+esc(c.type)+(c.related?': '+esc(c.related):'')+'</span>':'')+' <span class="muted">'+esc(c.time.slice(11,16))+'</span>'+(c.photo?' <a href="'+full(c.photo)+'" target="_blank" rel="noopener">📷</a>':'')+(bad?'<div class="flag" style="margin-top:4px">'+esc(c.flags)+'</div>':'')+'</div>'}).join('')};
+        return '<div>'+'<span class="chip '+(c.presence==='Absent'?'red':c.presence==='Late'?'yel':'grn')+'">'+esc(c.presence)+'</span> '+esc(c.guard||'No guard')+(S.role!=='supervisor'?gx(c):'')+(c.type!=='Regular'?' <span class="muted">· '+esc(c.type)+(c.related?': '+esc(c.related):'')+'</span>':'')+' <span class="muted">'+esc(c.time.slice(11,16))+'</span>'+(c.photo?' <a href="'+full(c.photo)+'" target="_blank" rel="noopener">📷</a>':'')+(bad?'<div class="flag" style="margin-top:4px">'+esc(c.flags)+'</div>':'')+'</div>'}).join('')};
     $('#td').outerHTML='<div id="td" style="display:flex;flex-direction:column;gap:12px"><div class="card"><b>Coverage</b><div>Day: '+cov('Day')+' of '+S.posts.length+' gates checked</div><div>Night: '+cov('Night')+' of '+S.posts.length+' gates checked</div></div>'+
      S.posts.map(function(p){var g=by[p]||{Day:[],Night:[]},warn=g.Day.concat(g.Night).some(function(c){return /DOUBLE|ABSENT/.test(c.flags)});
        return '<div class="card" style="'+(warn?'border-color:var(--red)':'')+'"><b>'+esc(p)+'</b><div><span class="muted">Day</span><br>'+line(g.Day)+'</div><div><span class="muted">Night</span><br>'+line(g.Night)+'</div></div>'}).join('')+'</div>';
+  });
+}
+function viewGuards(){
+  var m=$('#mn');m.innerHTML='<button class="btn o s" data-tab-go="home">← Home</button><h2>Guards <span class="gu">ગાર્ડ</span></h2><div class="f"><input id="gq" placeholder="Search name or number"></div><div id="gl" class="muted">Loading…</div>';goBtns(m);
+  call('bootstrap').then(function(b){if(b.ok&&b.guards)S.guards=b.guards;return call('checks',{from:ymd(-29),to:ymd(0)})}).then(function(r){
+    if(!r.ok){$('#gl').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
+    var last={},cnt={},bad={};
+    r.checks.forEach(function(c){if(!c.guardId)return;if(!last[c.guardId]||c.time>last[c.guardId].time)last[c.guardId]=c;if(c.presence!=='Absent')cnt[c.guardId]=(cnt[c.guardId]||0)+1;if(/DOUBLE/.test(c.flags))bad[c.guardId]=(bad[c.guardId]||0)+1});
+    var gs=(S.guards||[]).slice().sort(function(a,b){return ((last[b.id]||{}).time||'').localeCompare((last[a.id]||{}).time||'')});
+    function draw(q){
+      q=(q||'').toLowerCase();var l=gs.filter(function(g){return !q||(g.name+' '+g.phone+' '+g.id).toLowerCase().indexOf(q)>-1});
+      $('#gl').className='';$('#gl').innerHTML=l.length?l.map(function(g){var c=last[g.id];
+        return '<div class="card" style="flex-direction:row;gap:12px;align-items:flex-start;margin-bottom:10px">'+(miniPh(g.photo,72)||'<div style="width:72px;height:72px;border-radius:8px;background:var(--line)"></div>')+
+          '<div style="flex:1;min-width:0"><b>'+esc(g.name)+'</b> <span class="muted">'+esc(g.id)+'</span><div style="font-size:14px">'+phoneLinks(g.phone)+'</div>'+
+          '<div class="muted" style="font-size:13px">'+(c?'Last seen: '+esc(c.post)+' · '+esc(c.shift)+' · '+esc(c.date.slice(5))+' ('+esc(c.presence)+')':'Not seen in the last 30 days')+'</div>'+
+          '<div class="muted" style="font-size:13px">'+(cnt[g.id]||0)+' shifts in 30 days'+(bad[g.id]?' · <span class="chip red">'+bad[g.id]+' double-duty</span>':'')+'</div></div></div>'}).join(''):'<div class="muted">No guards found.</div>'}
+    draw('');$('#gq').oninput=function(){draw(this.value)};
   });
 }
 function periodRange(k){
@@ -338,7 +359,7 @@ function viewReport(){
      rows.map(function(r){return '<tr data-g="'+esc(r.p)+'" style="cursor:pointer"><td><b>'+esc(r.p)+'</b></td><td>'+r.slots+'</td><td>'+(r.abs?'<span class="chip red">'+r.abs+'</span>':'0')+'</td><td>'+r.late+'</td><td>'+r.tmp+'</td><td>'+r.perm+'</td><td>'+r.rot+'</td><td>'+(r.dbl?'<span class="chip red">'+r.dbl+'</span>':'0')+'</td><td>'+r.open+'</td></tr>'}).join('')+'</table><div class="muted">Tap a gate to see each day.</div></div></div>';
     [].forEach.call(document.querySelectorAll('tr[data-g]'),function(tr){tr.onclick=function(){
       var r=rows.filter(function(x){return x.p===tr.dataset.g})[0];
-      var d=modal('<h2>'+esc(r.p)+'</h2><div class="muted">'+r0[0]+' to '+r0[1]+'</div>'+(r.cs.length?'<table><tr><th>Date</th><th>Shift</th><th>Status</th><th>Guard</th></tr>'+r.cs.slice().reverse().map(function(c){return '<tr><td>'+esc(c.date.slice(5))+'</td><td>'+c.shift+'</td><td>'+esc(c.presence)+(c.type!=='Regular'?'<br><span class="muted">'+esc(c.type)+'</span>':'')+'</td><td>'+esc(c.guard||'—')+(/DOUBLE/.test(c.flags)?'<br><span class="chip red">Double duty</span>':'')+'</td></tr>'}).join('')+'</table>':'<div class="muted">No checks in this period.</div>')+'<button class="btn o" id="cx">Close</button>');
+      var d=modal('<h2>'+esc(r.p)+'</h2><div class="muted">'+r0[0]+' to '+r0[1]+'</div>'+(r.cs.length?'<table><tr><th>Date</th><th>Shift</th><th>Status</th><th>Guard</th></tr>'+r.cs.slice().reverse().map(function(c){return '<tr><td>'+esc(c.date.slice(5))+'</td><td>'+c.shift+'</td><td>'+esc(c.presence)+(c.type!=='Regular'?'<br><span class="muted">'+esc(c.type)+'</span>':'')+'</td><td>'+esc(c.guard||'—')+(S.role!=='supervisor'?gx(c):'')+(/DOUBLE/.test(c.flags)?'<br><span class="chip red">Double duty</span>':'')+'</td></tr>'}).join('')+'</table>':'<div class="muted">No checks in this period.</div>')+'<button class="btn o" id="cx">Close</button>');
       $('#cx',d).onclick=function(){d.remove()}}});
   });
 }
@@ -412,7 +433,7 @@ function viewHome(){
       var un=openI.filter(function(i){return i.status==='Open'}),urg=openI.filter(function(i){return i.priority==='Urgent'});
       html+='<div class="row">'+tile('Open issues',openI.length)+tile('Overdue',od.length,od.length?'err':'')+'</div><div class="row">'+tile('Not acknowledged',un.length,un.length?'err':'')+tile('Urgent',urg.length,urg.length?'err':'')+'</div>'+
         '<div class="card"><b>Needs action now</b>'+((un.concat(od.filter(function(i){return un.indexOf(i)<0}))).slice(0,5).map(issueLine).join('')||'<div class="muted">Nothing waiting.</div>')+'<button class="btn o s" data-tab-go="issues">All issues</button></div>'+
-        '<div class="card"><b>Coverage today</b>'+covLine('Day',nd,S.posts.length)+covLine('Night',nn,S.posts.length)+(S.posts.filter(function(p){return !cur[p]}).length?'<div class="muted">Not yet checked ('+sh.toLowerCase()+'): '+esc(S.posts.filter(function(p){return !cur[p]}).join(', '))+'</div>':'')+'<button class="btn o s" data-tab-go="today">See today by gate</button></div>'+
+        '<div class="card"><b>Coverage today</b>'+covLine('Day',nd,S.posts.length)+covLine('Night',nn,S.posts.length)+(S.posts.filter(function(p){return !cur[p]}).length?'<div class="muted">Not yet checked ('+sh.toLowerCase()+'): '+esc(S.posts.filter(function(p){return !cur[p]}).join(', '))+'</div>':'')+'<button class="btn o s" data-tab-go="today">See today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button></div>'+
         '<div class="card"><b>Warnings today ('+warn.length+')</b>'+(warn.length?warn.slice(0,6).map(function(c){return '<div class="flag">'+esc(c.post)+' · '+c.shift+' · '+esc(c.guard||'no guard')+'<br>'+esc(c.flags)+'</div>'}).join(''):'<div class="muted">No warnings today.</div>')+'</div>'+rosterCard();
     }else{
       var wc=rs[2].ok?rs[2].checks:[],ab=wc.filter(function(c){return c.presence==='Absent'}),db=wc.filter(function(c){return /DOUBLE/.test(c.flags)});
@@ -423,7 +444,7 @@ function viewHome(){
         '<div class="card"><b>Open issues by gate</b>'+(ogl.length?bars(ogl,'red'):'<div class="muted">None.</div>')+'</div>'+
         '<div class="card"><b>Absences by gate (7 days)</b>'+(ab.length?bars(by(ab),'red'):'<div class="muted">None.</div>')+'</div>'+
         '<div class="card"><b>Coverage today</b>'+covLine('Day',nd,S.posts.length)+covLine('Night',nn,S.posts.length)+'</div>'+rosterCard()+
-        '<div class="row"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>';
+        '<div class="row"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>';
     }
     $('#hm').outerHTML='<div id="hm" style="display:flex;flex-direction:column;gap:12px">'+html+'</div>';
     var root=$('#hm');goBtns(root);fillGateInstr();
