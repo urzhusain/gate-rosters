@@ -216,6 +216,8 @@ function openIssue(id){
   var i=(S.issues||[]).filter(function(x){return x.id===id})[0];if(!i)return;
   var btns='';
   if(S.role==='control'){btns=(i.status==='Solved'?'<button class="btn o" data-op="Reopened">Reopen</button>':'<div class="row"><button class="btn o s" data-op="Acknowledged">Acknowledge</button><button class="btn o s" data-op="In progress">In progress</button><button class="btn g s" data-op="Solved">Solved</button></div>')}
+  if(S.role==='control'&&i.status!=='Solved'){var AG=(window.SUP_CONFIG||{}).agencies||{Sainik:{name:'Sainik Security',whatsapp:''},Avengers:{name:'Avengers',whatsapp:''}};
+    btns+='<div class="f" style="margin-top:8px"><label>Forward to agency</label><select id="ag">'+Object.keys(AG).map(function(k){return '<option value="'+esc(k)+'">'+esc(AG[k].name)+'</option>'}).join('')+'</select></div><button class="btn g" id="fw">Forward to agency on WhatsApp</button>'}
   if(S.role==='head'){btns='<button class="btn r" data-op="Query">Ask Control Room: why not solved?</button>'+(i.status==='Solved'?'<button class="btn o" data-op="Reopened">Reopen</button>':'')}
   var d=modal('<h2>'+esc(i.id)+' · '+esc(i.post)+'</h2><div class="row">'+statusChip(i.status)+(i.priority==='Urgent'?'<span class="chip red">URGENT</span>':'')+'<span class="muted">'+esc(i.category)+' · '+ageTxt(i.created)+' old</span></div><div>'+esc(i.description)+'</div>'+
    (i.photo?'<a href="'+full(i.photo)+'" target="_blank" rel="noopener"><img class="th" alt="Issue photo" src="'+thumb(i.photo)+'"></a>':'')+
@@ -224,6 +226,11 @@ function openIssue(id){
    '<div class="f"><label>Remark</label><textarea id="ur" placeholder="'+(S.role==='head'?'Your question to the Control Room':'What was done?')+'"></textarea></div><div class="f"><label>Photo (optional)</label><input id="uf" type="file" accept="image/*" capture="environment"></div><div class="err" id="ue"></div>'+btns+
    '<button class="btn o s" data-op="Comment">Add comment only</button><button class="btn o" id="cl">Close</button>');
   $('#cl',d).onclick=function(){d.remove()};
+  if($('#fw',d))$('#fw',d).onclick=function(){
+    var k=$('#ag',d).value,a=((window.SUP_CONFIG||{}).agencies||{})[k]||{name:k,whatsapp:''},n=(a.whatsapp||'').replace(/\D/g,'');
+    var msg='Complaint '+i.id+' - '+i.post+'\n'+i.category+(i.priority==='Urgent'?' (URGENT)':'')+'\n'+i.description+'\nRaised '+ageTxt(i.created)+' ago. Please act and confirm.\n- Control Room, Aljamea';
+    window.open('https://wa.me/'+(n.length===10?'91'+n:n)+'?text='+encodeURIComponent(msg),'_blank');
+    call('updateIssue',{id:id,op:'Comment',remark:'Forwarded to '+a.name+' on WhatsApp'}).then(function(r){d.remove();toast(r.ok?'Forward recorded':'Forward not recorded');viewIssues()})};
   [].forEach.call(d.querySelectorAll('[data-op]'),function(b){b.onclick=function(){
     var op=b.dataset.op;b.disabled=true;
     compress($('#uf',d).files[0]).then(function(img){return call('updateIssue',{id:id,op:op,remark:$('#ur',d).value,photo:img})}).then(function(r){
