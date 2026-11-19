@@ -221,7 +221,11 @@ var GATES=[
    {t1:h[0],t2:h[1],sub:s,secs:[S('warn',AFTER,[FACE,NOFAM,NOPAR])]}]}},
  {id:'ys',name:'Yusufi gate',sub:'Boys Hostel',fn:function(c){var h=['YUSUFI MAKAAN','યુસુફી મકાન'],s=['Boys Hostel','બોયઝ હોસ્ટેલ'];return [
    {t1:h[0],t2:h[1],sub:s,secs:[].concat(prog(c,'ys'),[S('allow',DUTIES,[OPEN,KEYS,CLOSE,PARCEL_O,['Parents: there is NO waiting area here.','વાલીઓ માટે અહીં વેઇટિંગ એરિયા નથી.'],UNKNOWN])])},
-   {t1:h[0],t2:h[1],sub:s,secs:[S('warn',AFTER,[FACE,NOFAM,NOPAR])]}]}}
+   {t1:h[0],t2:h[1],sub:s,secs:[S('warn',AFTER,[FACE,NOFAM,NOPAR])]}]}},
+ {id:'sv',name:'Roaming supervisor',sub:'Control Room',fn:function(c){return [{t1:'SUPERVISOR',t2:'સુપરવાઇઝર',sub:['Roaming Supervisor (9 AM to 9 PM) & Control Room','ફરતા સુપરવાઇઝર (સવારે 9 થી રાત્રે 9) અને કંટ્રોલ રૂમ'],secs:[].concat(prog(c,'sv'),[
+   S('allow',['ROAMING SUPERVISOR – 9 AM TO 9 PM','ફરતા સુપરવાઇઝર – સવારે 9 થી રાત્રે 9'],[['Go to ALL gates and roam around to supervise.','બધા ગેટ પર જવું અને ફરીને દેખરેખ રાખવી.'],['Check that every gate keeper is at his post and alert.','દરેક ગેટ કીપર પોતાની જગ્યાએ અને સજાગ છે તે ચકાસવું.'],['Check that the gate rules are followed: ID card shown, visitors written in the register, gate pass for material going out.','ગેટના નિયમો પળાય છે તે ચકાસવું: ID કાર્ડ બતાવવું, મુલાકાતીની રજિસ્ટરમાં નોંધ, સામાન બહાર લઈ જવા ગેટ પાસ.']]),
+   S('warn',['IF YOU SEE A PROBLEM','કોઈ સમસ્યા દેખાય તો'],[red(['Report any breach of duty, any breach of security, or any job that needs action.','ફરજમાં ચૂક, સુરક્ષામાં ભંગ કે કોઈ પણ કામ જે કરવાનું હોય તેની જાણ કરવી.']),red(['RAISE A COMPLAINT to the Control Room. Do not ignore it.','કંટ્રોલ રૂમને ફરિયાદ નોંધાવવી. અવગણવું નહીં.'])]),
+   S('info',['CONTROL ROOM','કંટ્રોલ રૂમ'],[['Keeps watch on the cameras.','કેમેરા પર નજર રાખે છે.'],['Receives the supervisor\u2019s complaints and acts on them.','સુપરવાઇઝરની ફરિયાદો સ્વીકારે છે અને તેના પર કાર્યવાહી કરે છે.'],['No Sainik supervisor at night.','રાત્રે સૈનિકનો સુપરવાઇઝર નથી.']])])}]}}
 ];
 
 /* ---- helpers ---- */
