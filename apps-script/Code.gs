@@ -68,7 +68,11 @@ function rows_(name) {
   var h = v[0], out = [];
   for (var i = 1; i < v.length; i++) {
     var o = { _row: i + 1 };
-    for (var j = 0; j < h.length; j++) o[h[j]] = v[i][j] === '' ? '' : String(v[i][j]);
+    for (var j = 0; j < h.length; j++) {
+      var cell = v[i][j];
+      if (cell instanceof Date) cell = Utilities.formatDate(cell, TZ, h[j] === 'Date' ? 'yyyy-MM-dd' : 'yyyy-MM-dd HH:mm:ss');
+      o[h[j]] = cell === '' ? '' : String(cell);
+    }
     out.push(o);
   }
   return out;
