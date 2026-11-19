@@ -2,7 +2,10 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Security Control</title>
 <meta name="theme-color" content="#1F3A5F">
-<meta property="og:title" content="Security Control"><meta property="og:description" content="Supervisor rounds, issues and Control Room board.">
+<meta name="description" content="Rounds, issues and gate reports for the Aljamea-tus-Saifiyah Control Room.">
+<meta property="og:type" content="website"><meta property="og:title" content="Security Control · Aljamea-tus-Saifiyah"><meta property="og:description" content="Rounds, issues and gate reports for the Control Room.">
+<meta property="og:image" content="https://urzhusain.github.io/gate-rosters/supervisor/og-image.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:url" content="https://urzhusain.github.io/gate-rosters/supervisor/"><meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/icon-180.png"><link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gujarati:wght@400;600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>
@@ -49,6 +52,28 @@ img.th{width:100%;max-height:260px;object-fit:cover;border-radius:9px;border:1px
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:99px;font-weight:700;z-index:30;max-width:90%;text-align:center}
 table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;vertical-align:top}
 .gu{font-family:'Noto Sans Gujarati',var(--f)}
+/* look and feel */
+body{background:radial-gradient(1200px 400px at 50% -120px,rgba(31,58,95,.10),transparent 70%) no-repeat,var(--bg)}
+.top{box-shadow:0 3px 0 var(--gold),0 6px 18px rgba(0,0,0,.12)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand img{height:38px;width:auto;flex:none}
+.brand b,.brand small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand>div{min-width:0;border-left:1.5px solid rgba(255,255,255,.35);padding-left:12px}
+.card{box-shadow:0 1px 2px rgba(0,0,0,.05),0 6px 18px rgba(31,58,95,.07);border-radius:14px}
+h2{color:var(--navy);letter-spacing:-.01em}
+.btn{box-shadow:0 2px 0 rgba(0,0,0,.18);transition:transform .08s}
+.btn:active{transform:translateY(1px);box-shadow:none}
+input:focus,select:focus,textarea:focus{outline:3px solid var(--gold);outline-offset:1px;border-color:var(--navy)}
+.post{box-shadow:0 1px 2px rgba(0,0,0,.04);border-left:6px solid var(--line)}
+.post.done{border-left-color:var(--grn)}
+.post:active{transform:scale(.995)}
+.nav{box-shadow:0 -6px 18px rgba(0,0,0,.08)}
+.hero{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 10px 4px;text-align:center}
+.hero img{width:min(300px,72%);height:auto}
+.hero h1{margin:6px 0 0;font-size:24px;font-weight:800;color:var(--navy);letter-spacing:-.01em}
+.hero p{margin:0;color:var(--mute);font-size:14px}
+.logo-d{display:none}
+@media (prefers-color-scheme:dark){.logo-l{display:none}.logo-d{display:inline-block}}
 </style></head><body>
 <div id="app"></div>
 <script>document.write('<script src="config.js?t='+Date.now()+'"><\/script><script src="../config.js?t='+Date.now()+'"><\/script>')</script>
@@ -81,7 +106,7 @@ function compress(file){return new Promise(function(res){
 
 /* ---------- login ---------- */
 function viewLogin(msg){
-  $('#app').innerHTML='<div class="top"><div><b>Security Control</b><small>Aljamea-tus-Saifiyah</small></div></div><main><div class="card"><h2>Sign in</h2>'+
+  $('#app').innerHTML='<main><div class="hero"><img class="logo-l" src="../assets/logo.png" alt="Siyanat Al Mumtalakat"><img class="logo-d" src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><h1>Security Control</h1><p>Aljamea-tus-Saifiyah</p></div><div class="card"><h2>Sign in <span class="gu">સાઇન ઇન</span></h2>'+
   '<div class="f"><label for="pn">Your personal PIN <span class="gu">તમારો અંગત પિન</span></label><input id="pn" type="password" inputmode="numeric" autocomplete="current-password" value="'+esc(store('pin')||'')+'"></div>'+
   '<div class="err" id="le">'+esc(msg||'')+'</div><button class="btn" id="lg">Sign in</button></div></main>';
   $('#lg').onclick=function(){
@@ -104,7 +129,7 @@ function tabsFor(){
 function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role]}
 function main(){
   var tabs=tabsFor();
-  $('#app').innerHTML='<div class="top"><div><b>Security Control</b><small>'+esc(S.name)+' · '+roleName()+'</small></div><button id="lo">Sign out</button></div><main id="mn"></main>'+
+  $('#app').innerHTML='<div class="top"><div class="brand"><img src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><div><b>Security Control</b><small>'+(S.name===roleName()?esc(S.name):esc(S.name)+' · '+roleName())+'</small></div></div><button id="lo">Sign out</button></div><main id="mn"></main>'+
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
   $('#lo').onclick=logout;
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
@@ -131,7 +156,7 @@ function openCheck(post){
   var gs=S.guards.slice().sort(function(a,b){return a.name.localeCompare(b.name)});
   var d=modal('<h2>'+esc(post)+' · '+S.shift+'</h2>'+
   '<div class="f"><label>Guard on post</label><select id="gd"><option value="">— choose —</option>'+gs.map(function(g){return '<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>'}).join('')+'<option value="__new">+ New guard (register)</option></select></div>'+
-  '<div id="ng" hidden class="card"><b>Register new guard</b><div class="f"><label>Full name</label><input id="gn"></div><div class="f"><label>Phone</label><input id="gp" type="tel" inputmode="tel"></div><div class="f"><label>Photo of the guard</label><input id="gf" type="file" accept="image/*" capture="user"></div><button class="btn o s" id="gs">Save guard</button></div>'+
+  '<div id="ng" hidden class="card"><b>Register new guard</b><div class="f"><label>Full name</label><input id="gn"></div><div class="f"><label>Phone</label><input id="gp" type="tel" inputmode="tel"></div><div class="f"><label>Photo of the guard</label><input id="gf" type="file" accept="image/*" capture="user"></div><button class="btn o s" id="gs">Save guard</button><div id="gst" class="flag info" hidden></div></div>'+
   '<div class="f"><label>Presence</label><select id="pr"><option>Present</option><option>Late</option><option>Absent</option></select></div>'+
   '<div class="f"><label>Type of duty</label><select id="ty"><option value="Regular">Regular guard</option><option value="Temporary">Temporary replacement</option><option value="Permanent">Permanent replacement</option><option value="Rotation">Rotation (moved by agency)</option></select></div>'+
   '<div class="f" id="rl" hidden><label id="rll"></label><input id="rv"></div>'+
@@ -160,10 +185,19 @@ function openCheck(post){
   };
   $('#ty',d).onchange=function(){var t=this.value,r=$('#rl',d);r.hidden=t==='Regular';$('#rll',d).textContent=t==='Rotation'?'Moved from which post?':'Replacing whom? (name)'};
   $('#gs',d).onclick=function(){
-    var b=this;b.disabled=true;
-    compress($('#gf',d).files[0]).then(function(img){return call('addGuard',{name:$('#gn',d).value,phone:$('#gp',d).value,photo:img})}).then(function(r){
-      b.disabled=false;if(!r.ok){$('#ce',d).textContent=r.error;return}
-      S.guards.push(r.guard);var s=$('#gd',d);var o=document.createElement('option');o.value=r.guard.id;o.textContent=r.guard.name;s.insertBefore(o,s.lastElementChild);s.value=r.guard.id;$('#ng',d).hidden=true;$('#ce',d).textContent='';toast('Guard registered')})};
+    var b=this,st=$('#gst',d);
+    var nm=$('#gn',d).value.trim();
+    st.className='flag info';st.hidden=false;
+    if(nm.length<3){st.className='flag';st.textContent='Write the guard\'s full name first.';return}
+    b.disabled=true;b.textContent='Saving…';st.textContent='Saving the guard, please wait a few seconds…';
+    compress($('#gf',d).files[0]).then(function(img){return call('addGuard',{name:nm,phone:$('#gp',d).value,photo:img})}).then(function(r){
+      b.disabled=false;b.textContent='Save guard';
+      if(!r.ok){st.className='flag';st.textContent=r.error||'Could not save. Try again.';return}
+      S.guards.push(r.guard);var s=$('#gd',d);var o=document.createElement('option');o.value=r.guard.id;o.textContent=r.guard.name;s.insertBefore(o,s.lastElementChild);s.value=r.guard.id;s.onchange();
+      $('#gn',d).value='';$('#gp',d).value='';$('#gf',d).value='';
+      $('#ng',d).hidden=true;toast('✓ '+r.guard.name+' registered');
+      var w=$('#dw',d);if(w)w.innerHTML='<div class="flag ok" style="margin-top:8px">✓ '+esc(r.guard.name)+' registered and selected. Now choose Presence and save the check.</div>';
+    }).catch(function(){b.disabled=false;b.textContent='Save guard';st.className='flag';st.textContent='No connection. Check the internet and try again.'})};
   $('#sv',d).onclick=function(){
     var b=this,gid=$('#gd',d).value;
     if(gid==='__new'){$('#ce',d).textContent='Save the new guard first.';return}
