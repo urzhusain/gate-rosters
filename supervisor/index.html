@@ -80,7 +80,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--gold);outline-of
 <script>
 var API=(window.SUP_CONFIG||{}).apiUrl||'';
 var S={pin:'',name:'',role:'',posts:[],guards:[],overdue:24,tab:'',issues:null,checks:null,shift:'',filter:'',busy:false};
-var CATS=['Guard absent','Guard sleeping / away from post','Security breach','Visitor or entry problem','Gate pass / material','Camera / equipment','Cleanliness / maintenance','Other'];
+var CATS=['Guard absent','Guard sleeping / away from post','Security breach','Suspicious activity (seen on camera)','Visitor or entry problem','Gate pass / material','Camera / equipment','Cleanliness / maintenance','Other'];
 var $=function(s,r){return (r||document).querySelector(s)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
@@ -123,7 +123,7 @@ function logout(){S.pin='';S.role='';store('pin','');viewLogin()}
 
 /* ---------- shell ---------- */
 function tabsFor(){
-  if(S.role==='control')return [['home','🏠','Home'],['issues','📋','Issues'],['round','🚶','Round'],['report','📊','Report'],['roster','🗓️','Roster']];
+  if(S.role==='control')return [['home','🏠','Home'],['issues','📋','Issues'],['raise','📹','Camera'],['round','🚶','Round'],['report','📊','Report'],['roster','🗓️','Roster']];
   if(S.role==='head')return [['home','🏠','Home'],['issues','📋','Issues'],['report','📊','Report'],['roster','🗓️','Roster']];
   return [['home','🏠','Home'],['round','🚶','Round'],['raise','➕','Raise'],['issues','📋','Issues'],['roster','🗓️','Roster']];}
 function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role]}
@@ -214,21 +214,26 @@ function openCheck(post){
 /* ---------- raise ---------- */
 function viewRaise(){
   var pf=S.prefill||{};S.prefill=null;
-  $('#mn').innerHTML='<h2>Raise an issue <span class="gu">ફરિયાદ નોંધાવો</span></h2><div class="card">'+
+  var cam=S.role==='control';if(cam&&!pf.category)pf.category='Suspicious activity (seen on camera)';
+  $('#mn').innerHTML='<h2>'+(cam?'Report from cameras <span class="gu">કેમેરા પરથી જાણ</span>':'Raise an issue <span class="gu">ફરિયાદ નોંધાવો</span>')+'</h2><div class="card">'+
   '<div class="f"><label>Where?</label><select id="rp">'+S.posts.concat(['Other / whole campus']).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>What kind?</label><select id="rc">'+CATS.map(function(c){return '<option'+(pf.category===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>How urgent?</label><div class="seg" id="up"><button data-u="Normal" aria-pressed="true">Normal</button><button data-u="Urgent" aria-pressed="false">Urgent</button></div></div>'+
+  (cam?'<div class="f"><label>Camera or exact spot (optional)</label><input id="rcam" placeholder="e.g. Camera 12, near Gate 4 parking"></div>':'')+
   '<div class="f"><label>Details</label><textarea id="rd">'+esc(pf.description||'')+'</textarea></div>'+
-  '<div class="f"><label>Photo</label><input id="rf" type="file" accept="image/*" capture="environment"></div><div class="err" id="re"></div>'+
-  '<button class="btn" id="rs">Send to Control Room</button></div>';
+  (cam?'<label class="row" style="font-weight:700"><input id="rck" type="checkbox" style="width:auto"> Ask the Supervisor to go and check now</label>':'')+
+  '<div class="f"><label>Photo or screenshot</label><input id="rf" type="file" accept="image/*"'+(cam?'':' capture="environment"')+'></div><div class="err" id="re"></div>'+
+  '<button class="btn" id="rs">'+(cam?'Save report':'Send to Control Room')+'</button></div>';
   var urg='Normal';
   [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.onclick=function(){urg=b.dataset.u;[].forEach.call(document.querySelectorAll('[data-u]'),function(x){x.setAttribute('aria-pressed',x===b)})}});
+  function fullDesc(){var d=$('#rd').value.trim();if(!cam)return d;var c=($('#rcam')&&$('#rcam').value.trim())||'';return ($('#rck').checked?'[CHECK NOW] ':'')+(c?'('+c+') ':'')+d}
   $('#rs').onclick=function(){
     var b=this;b.disabled=true;b.textContent='Sending…';
-    compress($('#rf').files[0]).then(function(img){window._ri=img;return call('raiseIssue',{post:$('#rp').value,category:$('#rc').value,priority:urg,description:$('#rd').value,photo:img})}).then(function(r){
-      b.disabled=false;b.textContent='Send to Control Room';
+    compress($('#rf').files[0]).then(function(img){window._ri=img;return call('raiseIssue',{post:$('#rp').value,category:$('#rc').value,priority:urg,description:fullDesc(),photo:img})}).then(function(r){
+      b.disabled=false;b.textContent=cam?'Save report':'Send to Control Room';
       if(!r.ok){$('#re').textContent=r.error;return}
       S.issues=null;
+      if(cam){toast('Report '+r.id+' saved');S.tab='issues';S.filter='open';main();return}
       var CR=((window.SUP_CONFIG||{}).controlWhatsapp||'').replace(/\D/g,'');
       var msg=(urg==='Urgent'?'URGENT - ':'')+'Issue '+r.id+'\n'+$('#rp').value+' - '+$('#rc').value+'\n'+($('#rd').value||'(no details)')+'\nRaised by '+S.name+(window._ri?'\n(photo is in the app)':'');
       var wa='https://wa.me/'+(CR.length===10?'91'+CR:CR)+'?text='+encodeURIComponent(msg);
@@ -358,8 +363,9 @@ function fillGateInstr(){
   var box=$('#gi');if(!box)return;
   var f=document.createElement('iframe');f.style.cssText='position:absolute;left:-9999px;width:800px;height:600px;border:0';f.setAttribute('aria-hidden','true');f.src='../index.html?v='+Date.now();
   var tries=0,tm=setInterval(function(){
-    var w=f.contentWindow;tries++;
-    if(w&&w.GATES&&w.buildAll&&w.document.readyState!=='loading'){
+    var w=f.contentWindow,ready=false;tries++;
+    try{ready=!!(w&&w.GATES&&w.buildAll&&w.document.readyState!=='loading')}catch(e){}
+    if(ready){
       clearInterval(tm);
       try{
         var pages=w.buildAll([new Date()],w.GATES.map(function(g){return g.id}),'day'),h='',seen={};
@@ -400,6 +406,7 @@ function viewHome(){
       html+='<div class="card"><b>Round progress · '+sh+' shift</b>'+covLine(sh+' shift',S.posts.length-todo.length,S.posts.length)+
         (todo.length?'<div class="muted">Still to check:</div><div class="row">'+todo.slice(0,6).map(function(p){return '<button class="chip yel" style="border:0;font:inherit;font-weight:800" data-chk="'+esc(p)+'">'+esc(p)+'</button>'}).join('')+(todo.length>6?'<span class="muted">+'+(todo.length-6)+' more</span>':'')+'</div>':'<div class="flag ok">All gates checked this shift.</div>')+
         '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+
+        (function(){var ck=openI.filter(function(i){return /^\[CHECK NOW\]/.test(i.description)});return ck.length?'<div class="card" style="border-color:var(--red);border-width:2px"><b style="color:var(--red)">Control Room asks you to check ('+ck.length+')</b>'+ck.slice(0,5).map(issueLine).join('')+'</div>':''})()+
         '<div class="card"><b>My open issues ('+mine.length+')</b>'+(mine.length?mine.slice(0,4).map(issueLine).join(''):'<div class="muted">None. Everything you raised is solved.</div>')+'</div>'+rosterCard();
     }else if(S.role==='control'){
       var un=openI.filter(function(i){return i.status==='Open'}),urg=openI.filter(function(i){return i.priority==='Urgent'});
