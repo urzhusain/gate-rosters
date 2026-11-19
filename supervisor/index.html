@@ -82,16 +82,15 @@ function compress(file){return new Promise(function(res){
 /* ---------- login ---------- */
 function viewLogin(msg){
   $('#app').innerHTML='<div class="top"><div><b>Security Control</b><small>Aljamea-tus-Saifiyah</small></div></div><main><div class="card"><h2>Sign in</h2>'+
-  '<div class="f"><label for="nm">Your name <span class="gu">તમારું નામ</span></label><input id="nm" autocomplete="name" value="'+esc(store('name')||'')+'"></div>'+
-  '<div class="f"><label for="pn">PIN <span class="gu">પિન</span></label><input id="pn" type="password" inputmode="numeric" autocomplete="current-password" value="'+esc(store('pin')||'')+'"></div>'+
+  '<div class="f"><label for="pn">Your personal PIN <span class="gu">તમારો અંગત પિન</span></label><input id="pn" type="password" inputmode="numeric" autocomplete="current-password" value="'+esc(store('pin')||'')+'"></div>'+
   '<div class="err" id="le">'+esc(msg||'')+'</div><button class="btn" id="lg">Sign in</button></div></main>';
   $('#lg').onclick=function(){
-    var n=$('#nm').value.trim(),p=$('#pn').value.trim();
-    if(n.length<2||!p){$('#le').textContent='Enter your name and PIN.';return}
-    S.pin=p;S.name=n;$('#lg').disabled=true;$('#lg').textContent='Checking…';
+    var p=$('#pn').value.trim();
+    if(!p){$('#le').textContent='Enter your PIN.';return}
+    S.pin=p;$('#lg').disabled=true;$('#lg').textContent='Checking…';
     call('bootstrap').then(function(r){
       if(!r.ok){S.pin='';viewLogin(r.error);return}
-      store('name',n);store('pin',p);S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;
+      store('pin',p);S.name=r.name;S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;
       S.shift=defShift();S.tab='home';S.filter=r.role==='head'?'overdue':'open';
       main()})};
 }

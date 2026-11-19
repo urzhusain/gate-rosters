@@ -1,7 +1,7 @@
 /**
  * Aljamea Security Control: backend.
  * Lives in a Google Sheet you own. Run setup() once, then deploy as a Web app.
- * Sheets: Posts, Guards, Checks, Issues, Log, Settings. Photos go to a Drive folder.
+ * Sheets: Posts, Guards, Checks, Issues, Log, Settings, Users (one row per person: Name, PIN, Role, Active). Photos go to a Drive folder.
  */
 var TZ = 'Asia/Kolkata';
 var HEAD = {
@@ -10,7 +10,8 @@ var HEAD = {
   Checks: ['Time', 'Date', 'Shift', 'Post', 'GuardId', 'Guard', 'Presence', 'Type', 'Related', 'Remark', 'PhotoId', 'By', 'Flags'],
   Issues: ['ID', 'Created', 'Post', 'Category', 'Priority', 'Description', 'PhotoId', 'RaisedBy', 'Status', 'LastRemark', 'Updated', 'SolvedAt'],
   Log: ['Time', 'IssueID', 'By', 'Role', 'Action', 'Remark', 'PhotoId'],
-  Settings: ['Key', 'Value']
+  Settings: ['Key', 'Value'],
+  Users: ['Name', 'PIN', 'Role', 'Active']
 };
 var POSTS = ['Gate 1', 'Gate 2', 'Gate 4', 'Gate 6 (Rabvat)', 'Gate 8 & 9', 'MVD Gate 10', 'Mahad Gate',
   'Masakin front gate', 'Masakin back gate', 'Raj Manzil', 'Yusufi Makan', 'Ezzy Makan', 'Funun-ul-Quran',
@@ -98,12 +99,18 @@ function photo_(dataUrl, prefix) {
   return f.getId();
 }
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
-function roleOf_(pin) {
-  var s = settings_(); pin = String(pin || '');
+function userOf_(pin) {
+  pin = String(pin || '').trim();
   if (!pin) return null;
-  if (pin === s.supervisor_pin) return 'supervisor';
-  if (pin === s.control_pin) return 'control';
-  if (pin === s.head_pin) return 'head';
+  var sh = ss_().getSheetByName('Users');
+  if (!sh) return null;
+  var us = rows_('Users');
+  for (var i = 0; i < us.length; i++) {
+    var u = us[i], role = String(u.Role || '').trim().toLowerCase();
+    if (String(u.PIN).trim() === pin && String(u.Active || 'Yes').trim().toLowerCase() !== 'no' && { supervisor: 1, control: 1, head: 1 }[role]) {
+      return { name: String(u.Name).trim(), role: role };
+    }
+  }
   return null;
 }
 
@@ -113,11 +120,11 @@ function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(20000);
-    var q = JSON.parse(e.postData.contents), role = roleOf_(q.pin);
-    if (!role) return json_({ ok: false, error: 'Wrong PIN' });
-    var by = String(q.by || '').slice(0, 60);
+    var q = JSON.parse(e.postData.contents), user = userOf_(q.pin);
+    if (!user) return json_({ ok: false, error: 'Wrong PIN' });
+    var role = user.role, by = user.name;
     switch (q.action) {
-      case 'bootstrap': return json_(bootstrap_(role));
+      case 'bootstrap': return json_(bootstrap_(role, by));
       case 'addGuard': return json_(addGuard_(q, by, role));
       case 'submitCheck': return json_(submitCheck_(q, by, role));
       case 'raiseIssue': return json_(raiseIssue_(q, by, role));
@@ -133,10 +140,10 @@ function doPost(e) {
   }
 }
 
-function bootstrap_(role) {
+function bootstrap_(role, name) {
   var s = settings_();
   return {
-    ok: true, role: role, overdueHours: Number(s.overdue_hours) || 24,
+    ok: true, role: role, name: name, overdueHours: Number(s.overdue_hours) || 24,
     posts: rows_('Posts').map(function (r) { return r.Post; }).filter(String),
     guards: rows_('Guards').filter(function (g) { return g.Status !== 'Left'; }).map(guardOut_)
   };
