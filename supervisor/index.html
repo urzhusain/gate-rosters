@@ -119,9 +119,10 @@ function viewRound(){
   [].forEach.call(m.querySelectorAll('[data-s]'),function(b){b.onclick=function(){S.shift=b.dataset.s;viewRound()}});
   loadChecks().then(function(){
     var done={};(S.checks||[]).filter(function(c){return c.shift===S.shift}).forEach(function(c){done[c.post]=(done[c.post]||0)+1});
+    var dbl={};(S.checks||[]).filter(function(c){return /DOUBLE/.test(c.flags)}).forEach(function(c){dbl[c.post]=1});
     var n=Object.keys(done).length;
     $('#pl').outerHTML='<div class="muted" id="pl">'+n+' of '+S.posts.length+' posts checked this '+S.shift.toLowerCase()+' shift. Tap a post to record.</div>'+
-     S.posts.map(function(p){return '<button class="post'+(done[p]?' done':'')+'" data-p="'+esc(p)+'"><span><b>'+esc(p)+'</b><small>'+(done[p]?done[p]+' check'+(done[p]>1?'s':'')+' recorded':'Not checked yet')+'</small></span><span class="chip '+(done[p]?'grn':'yel')+'">'+(done[p]?'✓':'Check')+'</span></button>'}).join('');
+     S.posts.map(function(p){return '<button class="post'+(done[p]?' done':'')+'" data-p="'+esc(p)+'"><span><b>'+esc(p)+'</b><small>'+(done[p]?done[p]+' check'+(done[p]>1?'s':'')+' recorded':'Not checked yet')+'</small></span><span>'+(dbl[p]?'<span class="chip red">⚠ Double duty</span> ':'')+'<span class="chip '+(done[p]?'grn':'yel')+'">'+(done[p]?'✓':'Check')+'</span></span></button>'}).join('');
     [].forEach.call(m.querySelectorAll('[data-p]'),function(b){b.onclick=function(){openCheck(b.dataset.p)}});
   });
 }
@@ -139,7 +140,25 @@ function openCheck(post){
   '<div class="f"><label>Remark (optional)</label><textarea id="rm"></textarea></div><div class="err" id="ce"></div>'+
   '<button class="btn" id="sv">Save check</button><button class="btn o" id="cn">Cancel</button>');
   $('#cn',d).onclick=function(){d.remove()};
-  $('#gd',d).onchange=function(){$('#ng',d).hidden=this.value!=='__new'};
+  var dutyMap={};
+  call('checks',{from:ymd(-1),to:ymd(0)}).then(function(r){
+    if(!r.ok||!d.isConnected)return;
+    var cut=Date.now()-24*36e5,today=ymd(0);
+    r.checks.forEach(function(c){
+      if(c.presence==='Absent'||!c.guardId)return;
+      if(parseT(c.time).getTime()<cut)return;
+      if(c.date===today&&c.shift===S.shift)return;
+      dutyMap[c.guardId]=c;
+    });
+    [].forEach.call($('#gd',d).options,function(o){if(dutyMap[o.value]&&o.textContent.charAt(0)!=='⚠')o.textContent='⚠ '+o.textContent});
+    $('#gd',d).onchange();
+  });
+  $('#gd',d).onchange=function(){
+    $('#ng',d).hidden=this.value!=='__new';
+    var w=$('#dw',d),c=dutyMap[this.value];
+    if(!w){w=document.createElement('div');w.id='dw';this.parentNode.appendChild(w)}
+    w.innerHTML=c?'<div class="flag" style="margin-top:8px">⚠ Possible double duty: this guard was also at <b>'+esc(c.post)+'</b> ('+esc(c.shift)+', '+esc(c.date)+'). Ask him, and tell the Control Room.</div>':'';
+  };
   $('#ty',d).onchange=function(){var t=this.value,r=$('#rl',d);r.hidden=t==='Regular';$('#rll',d).textContent=t==='Rotation'?'Moved from which post?':'Replacing whom? (name)'};
   $('#gs',d).onclick=function(){
     var b=this;b.disabled=true;
