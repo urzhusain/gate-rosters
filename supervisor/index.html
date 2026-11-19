@@ -173,10 +173,19 @@ function viewRaise(){
   [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.onclick=function(){urg=b.dataset.u;[].forEach.call(document.querySelectorAll('[data-u]'),function(x){x.setAttribute('aria-pressed',x===b)})}});
   $('#rs').onclick=function(){
     var b=this;b.disabled=true;b.textContent='Sending…';
-    compress($('#rf').files[0]).then(function(img){return call('raiseIssue',{post:$('#rp').value,category:$('#rc').value,priority:urg,description:$('#rd').value,photo:img})}).then(function(r){
+    compress($('#rf').files[0]).then(function(img){window._ri=img;return call('raiseIssue',{post:$('#rp').value,category:$('#rc').value,priority:urg,description:$('#rd').value,photo:img})}).then(function(r){
       b.disabled=false;b.textContent='Send to Control Room';
       if(!r.ok){$('#re').textContent=r.error;return}
-      toast('Issue '+r.id+' raised');S.issues=null;S.tab='issues';S.filter='open';main()})};
+      S.issues=null;
+      var CR=((window.SUP_CONFIG||{}).controlWhatsapp||'').replace(/\D/g,'');
+      var msg=(urg==='Urgent'?'URGENT - ':'')+'Issue '+r.id+'\n'+$('#rp').value+' - '+$('#rc').value+'\n'+($('#rd').value||'(no details)')+'\nRaised by '+S.name+(window._ri?'\n(photo is in the app)':'');
+      var wa='https://wa.me/'+(CR.length===10?'91'+CR:CR)+'?text='+encodeURIComponent(msg);
+      var d=modal('<h2>Issue '+esc(r.id)+' raised <span class="gu">નોંધાઈ ગઈ</span></h2><p>It is now in the Control Room list. Tap below to also alert the Control Room manager on WhatsApp.</p>'+
+        '<a class="btn g" id="wa" href="'+wa+'" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;display:block">Send on WhatsApp</a>'+
+        '<button class="btn o" id="wd">Done</button>');
+      $('#wd',d).onclick=function(){d.remove();S.tab='issues';S.filter='open';main()};
+      $('#wa',d).onclick=function(){setTimeout(function(){d.remove();S.tab='issues';S.filter='open';main()},600)};
+      })};
 }
 
 /* ---------- issues ---------- */
