@@ -1,6 +1,6 @@
 /* Gate Roster Desk: live settings. Claude updates this file when timings or instructions change. */
 window.ROSTER_CONFIG={
-updated:"19 Nov 2026, 6:35 PM",
+updated:"19 Nov 2026, 6:38 PM",
 g4Std:{
   1:["8:35 AM","3:30 PM","8:35","3:30"],2:["8:35 AM","3:30 PM","8:35","3:30"],3:["8:35 AM","3:30 PM","8:35","3:30"],4:["8:35 AM","3:30 PM","8:35","3:30"],
   5:["8:00 AM","3:30 PM","8:00","3:30"],6:["8:00 AM","1:45 PM","8:00","1:45"]
@@ -17,7 +17,7 @@ programs:[
   {gate:"g8",from:"2026-11-20",to:"2026-11-20",
    en:"Saire Ilmi of Aljamea-tus-Saifiyah (Raza granted)",gu:"સૈરે ઇલ્મી, અલજામિયા-તુસ-સૈફિયા (રઝા મળેલ છે)",
    time:["4:00 PM","બપોરે 4:00 વાગ્યે"],gateName:["Gate 8","ગેટ 8"],
-   people:["100 mumineen","100 મોમિનીન"],pass:["Raza granted for these mumineen","આ મોમિનીનને રઝા મળેલ છે"],recv:null}
+   people:["100 mumineen","100 મોમિનીન"],pass:["ID or names to be confirmed with Tanzeem Office","ID અથવા નામ તંઝીમ ઓફિસ સાથે ખાતરી કરવા"],recv:null}
 ],
 /* notes: gates is "all" or a list of ids: g1 g4 g6 g8 m7 mf mb rm ys */
 notes:[]
