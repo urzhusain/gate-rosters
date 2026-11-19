@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Security Control</title>
+<meta name="theme-color" content="#1F3A5F">
+<meta property="og:title" content="Security Control"><meta property="og:description" content="Supervisor rounds, issues and Control Room board.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gujarati:wght@400;600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--bg:#F4F4F1;--fg:#16191E;--mute:#5B616A;--line:#D8D7D0;--card:#fff;--navy:#1F3A5F;--on:#fff;--gold:#F2B84B;--red:#B91C1C;--redbg:#FDE9D9;--grn:#166534;--grnbg:#E4F2E4;--yel:#8A5A00;--yelbg:#FFF2CC;--blu:#1E4E8C;--blubg:#E4ECF7;
+ --f:'Public Sans','Noto Sans Gujarati',system-ui,-apple-system,'Segoe UI',sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#12151A;--fg:#ECEBE6;--mute:#A0A5AD;--line:#2D3138;--card:#1A1E24;--navy:#8FB4E3;--on:#10141A;--gold:#F2B84B;--red:#FCA5A5;--redbg:#3A1D1D;--grn:#86EFAC;--grnbg:#16301F;--yel:#FCD34D;--yelbg:#3A2F10;--blu:#93C5FD;--blubg:#1A2635;color-scheme:dark}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html,body{margin:0}body{background:var(--bg);color:var(--fg);font:16px/1.45 var(--f);padding-bottom:84px}
+.top{background:var(--navy);color:var(--on);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
+.top b{font-weight:800;font-size:17px}.top small{display:block;opacity:.85;font-size:12.5px}
+.top button{background:transparent;border:1.5px solid currentColor;color:inherit;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;font-weight:600}
+main{max-width:640px;margin:0 auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+h2{margin:4px 0 0;font-size:20px;font-weight:800}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.f{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+label{font-weight:700;font-size:14px}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1.5px solid var(--line);border-radius:9px;padding:12px;width:100%;min-width:0}
+textarea{min-height:84px;resize:vertical}
+.btn{font:inherit;font-weight:800;font-size:16px;border-radius:10px;padding:14px 16px;border:2px solid var(--navy);background:var(--navy);color:var(--on);cursor:pointer;width:100%}
+.btn.s{width:auto;padding:9px 14px;font-size:14px}.btn.o{background:transparent;color:var(--navy)}.btn.r{background:var(--red);border-color:var(--red);color:#fff}.btn.g{background:var(--grn);border-color:var(--grn);color:var(--bg)}
+.btn[disabled]{opacity:.5}
+.seg{display:flex;border:2px solid var(--navy);border-radius:10px;overflow:hidden}
+.seg button{flex:1;font:inherit;font-weight:700;padding:11px;border:0;background:transparent;color:var(--navy)}
+.seg button[aria-pressed=true]{background:var(--navy);color:var(--on)}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0);z-index:6}
+.nav button{flex:1;font:inherit;font-size:12.5px;font-weight:700;background:none;border:0;padding:10px 4px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:2px}
+.nav button[aria-current=true]{color:var(--navy);box-shadow:inset 0 3px 0 var(--navy)}
+.nav i{font-style:normal;font-size:20px;line-height:1}
+.chip{display:inline-block;font-size:12px;font-weight:800;padding:3px 9px;border-radius:99px;background:var(--blubg);color:var(--blu)}
+.chip.red{background:var(--redbg);color:var(--red)}.chip.grn{background:var(--grnbg);color:var(--grn)}.chip.yel{background:var(--yelbg);color:var(--yel)}
+.post{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;width:100%;font:inherit;background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:14px;color:var(--fg)}
+.post b{font-size:16.5px}.post small{color:var(--mute);display:block}
+.post.done{border-color:var(--grn)}
+.flag{padding:9px 11px;border-radius:9px;font-size:14px;font-weight:600;background:var(--redbg);color:var(--red)}
+.flag.ok{background:var(--grnbg);color:var(--grn)}.flag.info{background:var(--yelbg);color:var(--yel)}
+.muted{color:var(--mute);font-size:14px}
+.err{color:var(--red);font-weight:700;font-size:14px}
+img.th{width:100%;max-height:260px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
+.log{border-left:3px solid var(--line);padding-left:10px;font-size:13.5px;color:var(--mute)}
+.log b{color:var(--fg)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;display:flex;flex-direction:column;gap:12px}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:99px;font-weight:700;z-index:30;max-width:90%;text-align:center}
+table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;vertical-align:top}
+.gu{font-family:'Noto Sans Gujarati',var(--f)}
+</style></head><body>
+<div id="app"></div>
+<script src="config.js"></script>
+<script>
+var API=(window.SUP_CONFIG||{}).apiUrl||'';
+var S={pin:'',name:'',role:'',posts:[],guards:[],overdue:24,tab:'',issues:null,checks:null,shift:'',filter:'',busy:false};
+var CATS=['Guard absent','Guard sleeping / away from post','Security breach','Visitor or entry problem','Gate pass / material','Camera / equipment','Cleanliness / maintenance','Other'];
+var $=function(s,r){return (r||document).querySelector(s)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+function toast(m){var t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(function(){t.remove()},2600)}
+function call(action,data){
+  if(!API)return Promise.resolve({ok:false,error:'The app is not connected yet. Setup is pending.'});
+  var body=JSON.stringify(Object.assign({action:action,pin:S.pin,by:S.name},data||{}));
+  return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}).then(function(r){return r.json()}).catch(function(){return {ok:false,error:'No connection. Check your internet and try again.'}});
+}
+function nowIST(){return new Date()}
+function parseT(s){return new Date(String(s).replace(' ','T')+'+05:30')}
+function ageH(s){return (Date.now()-parseT(s).getTime())/36e5}
+function ageTxt(s){var h=ageH(s);if(h<1)return Math.max(1,Math.round(h*60))+' min';if(h<48)return Math.round(h)+' h';return Math.round(h/24)+' days'}
+function defShift(){var h=new Date().getHours();return (h>=7&&h<19)?'Day':'Night'}
+function thumb(id,sz){return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w'+(sz||600)}
+function full(id){return 'https://drive.google.com/file/d/'+encodeURIComponent(id)+'/view'}
+function compress(file){return new Promise(function(res){
+  if(!file)return res('');
+  var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){
+    var m=1000,s=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.68))};im.onerror=function(){res('')};im.src=r.result};r.onerror=function(){res('')};r.readAsDataURL(file)})}
+
+/* ---------- login ---------- */
+function viewLogin(msg){
+  $('#app').innerHTML='<div class="top"><div><b>Security Control</b><small>Aljamea-tus-Saifiyah</small></div></div><main><div class="card"><h2>Sign in</h2>'+
+  '<div class="f"><label for="nm">Your name <span class="gu">તમારું નામ</span></label><input id="nm" autocomplete="name" value="'+esc(store('name')||'')+'"></div>'+
+  '<div class="f"><label for="pn">PIN <span class="gu">પિન</span></label><input id="pn" type="password" inputmode="numeric" autocomplete="current-password" value="'+esc(store('pin')||'')+'"></div>'+
+  '<div class="err" id="le">'+esc(msg||'')+'</div><button class="btn" id="lg">Sign in</button></div></main>';
+  $('#lg').onclick=function(){
+    var n=$('#nm').value.trim(),p=$('#pn').value.trim();
+    if(n.length<2||!p){$('#le').textContent='Enter your name and PIN.';return}
+    S.pin=p;S.name=n;$('#lg').disabled=true;$('#lg').textContent='Checking…';
+    call('bootstrap').then(function(r){
+      if(!r.ok){S.pin='';viewLogin(r.error);return}
+      store('name',n);store('pin',p);S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;
+      S.shift=defShift();S.tab=r.role==='head'?'issues':(r.role==='supervisor'?'round':'issues');S.filter=r.role==='head'?'overdue':'open';
+      main()})};
+}
+function logout(){S.pin='';S.role='';store('pin','');viewLogin()}
+
+/* ---------- shell ---------- */
+function tabsFor(){
+  var t=[['issues','📋','Issues'],['round','🚶','Round'],['raise','➕','Raise'],['today','✅','Today']];
+  if(S.role==='head')t=[['issues','📋','Issues'],['today','✅','Today'],['raise','➕','Raise']];
+  return t}
+function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role]}
+function main(){
+  var tabs=tabsFor();
+  $('#app').innerHTML='<div class="top"><div><b>Security Control</b><small>'+esc(S.name)+' · '+roleName()+'</small></div><button id="lo">Sign out</button></div><main id="mn"></main>'+
+   '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
+  $('#lo').onclick=logout;
+  [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
+  var v={issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday}[S.tab];v();
+}
+
+/* ---------- round ---------- */
+function viewRound(){
+  var m=$('#mn');
+  m.innerHTML='<h2>Round <span class="gu">રાઉન્ડ</span></h2><div class="seg" id="sg"><button data-s="Day" aria-pressed="'+(S.shift==='Day')+'">Day</button><button data-s="Night" aria-pressed="'+(S.shift==='Night')+'">Night</button></div><div id="pl" class="muted">Loading…</div>';
+  [].forEach.call(m.querySelectorAll('[data-s]'),function(b){b.onclick=function(){S.shift=b.dataset.s;viewRound()}});
+  loadChecks().then(function(){
+    var done={};(S.checks||[]).filter(function(c){return c.shift===S.shift}).forEach(function(c){done[c.post]=(done[c.post]||0)+1});
+    var n=Object.keys(done).length;
+    $('#pl').outerHTML='<div class="muted" id="pl">'+n+' of '+S.posts.length+' posts checked this '+S.shift.toLowerCase()+' shift. Tap a post to record.</div>'+
+     S.posts.map(function(p){return '<button class="post'+(done[p]?' done':'')+'" data-p="'+esc(p)+'"><span><b>'+esc(p)+'</b><small>'+(done[p]?done[p]+' check'+(done[p]>1?'s':'')+' recorded':'Not checked yet')+'</small></span><span class="chip '+(done[p]?'grn':'yel')+'">'+(done[p]?'✓':'Check')+'</span></button>'}).join('');
+    [].forEach.call(m.querySelectorAll('[data-p]'),function(b){b.onclick=function(){openCheck(b.dataset.p)}});
+  });
+}
+function loadChecks(){return call('checks').then(function(r){if(r.ok)S.checks=r.checks;else toast(r.error);return r})}
+function modal(html){var d=document.createElement('div');d.className='modal';d.innerHTML='<div class="sheet">'+html+'</div>';d.onclick=function(e){if(e.target===d)d.remove()};document.body.appendChild(d);return d}
+function openCheck(post){
+  var gs=S.guards.slice().sort(function(a,b){return a.name.localeCompare(b.name)});
+  var d=modal('<h2>'+esc(post)+' · '+S.shift+'</h2>'+
+  '<div class="f"><label>Guard on post</label><select id="gd"><option value="">— choose —</option>'+gs.map(function(g){return '<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>'}).join('')+'<option value="__new">+ New guard (register)</option></select></div>'+
+  '<div id="ng" hidden class="card"><b>Register new guard</b><div class="f"><label>Full name</label><input id="gn"></div><div class="f"><label>Phone</label><input id="gp" type="tel" inputmode="tel"></div><div class="f"><label>Photo of the guard</label><input id="gf" type="file" accept="image/*" capture="user"></div><button class="btn o s" id="gs">Save guard</button></div>'+
+  '<div class="f"><label>Presence</label><select id="pr"><option>Present</option><option>Late</option><option>Absent</option></select></div>'+
+  '<div class="f"><label>Type of duty</label><select id="ty"><option value="Regular">Regular guard</option><option value="Temporary">Temporary replacement</option><option value="Permanent">Permanent replacement</option><option value="Rotation">Rotation (moved by agency)</option></select></div>'+
+  '<div class="f" id="rl" hidden><label id="rll"></label><input id="rv"></div>'+
+  '<div class="f"><label>Photo at post (optional)</label><input id="ph" type="file" accept="image/*" capture="environment"></div>'+
+  '<div class="f"><label>Remark (optional)</label><textarea id="rm"></textarea></div><div class="err" id="ce"></div>'+
+  '<button class="btn" id="sv">Save check</button><button class="btn o" id="cn">Cancel</button>');
+  $('#cn',d).onclick=function(){d.remove()};
+  $('#gd',d).onchange=function(){$('#ng',d).hidden=this.value!=='__new'};
+  $('#ty',d).onchange=function(){var t=this.value,r=$('#rl',d);r.hidden=t==='Regular';$('#rll',d).textContent=t==='Rotation'?'Moved from which post?':'Replacing whom? (name)'};
+  $('#gs',d).onclick=function(){
+    var b=this;b.disabled=true;
+    compress($('#gf',d).files[0]).then(function(img){return call('addGuard',{name:$('#gn',d).value,phone:$('#gp',d).value,photo:img})}).then(function(r){
+      b.disabled=false;if(!r.ok){$('#ce',d).textContent=r.error;return}
+      S.guards.push(r.guard);var s=$('#gd',d);var o=document.createElement('option');o.value=r.guard.id;o.textContent=r.guard.name;s.insertBefore(o,s.lastElementChild);s.value=r.guard.id;$('#ng',d).hidden=true;$('#ce',d).textContent='';toast('Guard registered')})};
+  $('#sv',d).onclick=function(){
+    var b=this,gid=$('#gd',d).value;
+    if(gid==='__new'){$('#ce',d).textContent='Save the new guard first.';return}
+    b.disabled=true;b.textContent='Saving…';
+    compress($('#ph',d).files[0]).then(function(img){return call('submitCheck',{shift:S.shift,post:post,guardId:gid,presence:$('#pr',d).value,type:$('#ty',d).value,related:$('#rv',d).value,remark:$('#rm',d).value,photo:img})}).then(function(r){
+      b.disabled=false;b.textContent='Save check';
+      if(!r.ok){$('#ce',d).textContent=r.error;return}
+      d.querySelector('.sheet').innerHTML='<h2>Saved ✓</h2>'+(r.flags.length?r.flags.map(function(f){return '<div class="flag '+(/^(DOUBLE|ABSENT|NEW)/.test(f)?'':'info')+'">'+esc(f)+'</div>'}).join(''):'<div class="flag ok">All fine. No warnings.</div>')+'<button class="btn" id="ok">Done</button>'+
+        (r.flags.some(function(f){return /^(DOUBLE|ABSENT)/.test(f)})?'<button class="btn r" id="ri">Raise an issue about this</button>':'');
+      $('#ok',d).onclick=function(){d.remove();viewRound()};
+      var ri=$('#ri',d);if(ri)ri.onclick=function(){d.remove();S.prefill={post:post,category:r.flags.some(function(f){return /^ABSENT/.test(f)})?'Guard absent':'Other',description:r.flags.join('. ')};S.tab='raise';main()}})};
+}
+
+/* ---------- raise ---------- */
+function viewRaise(){
+  var pf=S.prefill||{};S.prefill=null;
+  $('#mn').innerHTML='<h2>Raise an issue <span class="gu">ફરિયાદ નોંધાવો</span></h2><div class="card">'+
+  '<div class="f"><label>Where?</label><select id="rp">'+S.posts.concat(['Other / whole campus']).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
+  '<div class="f"><label>What kind?</label><select id="rc">'+CATS.map(function(c){return '<option'+(pf.category===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>'+
+  '<div class="f"><label>How urgent?</label><div class="seg" id="up"><button data-u="Normal" aria-pressed="true">Normal</button><button data-u="Urgent" aria-pressed="false">Urgent</button></div></div>'+
+  '<div class="f"><label>Details</label><textarea id="rd">'+esc(pf.description||'')+'</textarea></div>'+
+  '<div class="f"><label>Photo</label><input id="rf" type="file" accept="image/*" capture="environment"></div><div class="err" id="re"></div>'+
+  '<button class="btn" id="rs">Send to Control Room</button></div>';
+  var urg='Normal';
+  [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.onclick=function(){urg=b.dataset.u;[].forEach.call(document.querySelectorAll('[data-u]'),function(x){x.setAttribute('aria-pressed',x===b)})}});
+  $('#rs').onclick=function(){
+    var b=this;b.disabled=true;b.textContent='Sending…';
+    compress($('#rf').files[0]).then(function(img){return call('raiseIssue',{post:$('#rp').value,category:$('#rc').value,priority:urg,description:$('#rd').value,photo:img})}).then(function(r){
+      b.disabled=false;b.textContent='Send to Control Room';
+      if(!r.ok){$('#re').textContent=r.error;return}
+      toast('Issue '+r.id+' raised');S.issues=null;S.tab='issues';S.filter='open';main()})};
+}
+
+/* ---------- issues ---------- */
+function isOverdue(i){return i.status!=='Solved'&&ageH(i.created)>=S.overdue}
+function viewIssues(){
+  var m=$('#mn');
+  m.innerHTML='<h2>Issues <span class="gu">ફરિયાદો</span></h2><div class="seg" id="fl"><button data-f="overdue">Overdue</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
+  [].forEach.call(m.querySelectorAll('[data-f]'),function(b){b.setAttribute('aria-pressed',S.filter===b.dataset.f);b.onclick=function(){S.filter=b.dataset.f;renderIssues();[].forEach.call(m.querySelectorAll('[data-f]'),function(x){x.setAttribute('aria-pressed',S.filter===x.dataset.f)})}});
+  call('issues').then(function(r){if(!r.ok){$('#il').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}S.issues=r.issues;renderIssues()});
+}
+function renderIssues(){
+  var all=S.issues||[],f=S.filter,list=all.filter(function(i){return f==='overdue'?isOverdue(i):f==='open'?i.status!=='Solved':i.status==='Solved'});
+  list.sort(function(a,b){return (a.priority==='Urgent'?0:1)-(b.priority==='Urgent'?0:1)||parseT(a.created)-parseT(b.created)});
+  var od=all.filter(isOverdue).length;
+  var box=$('#il');
+  box.className='';box.style.display='flex';box.style.flexDirection='column';box.style.gap='12px';
+  box.innerHTML=(od?'<div class="flag">'+od+' issue'+(od>1?'s':'')+' unsolved for more than '+S.overdue+' hours.</div>':'')+
+   (list.length?list.map(issueCard).join(''):'<div class="muted">Nothing here.</div>');
+  [].forEach.call(box.querySelectorAll('[data-i]'),function(b){b.onclick=function(){openIssue(b.dataset.i)}});
+}
+function statusChip(s){return '<span class="chip '+({Open:'red','In progress':'yel',Acknowledged:'yel',Solved:'grn'}[s]||'')+'">'+esc(s)+'</span>'}
+function issueCard(i){
+  return '<button class="post" data-i="'+esc(i.id)+'" style="flex-direction:column;align-items:stretch"><span class="row" style="justify-content:space-between"><b>'+esc(i.id)+' · '+esc(i.post)+'</b>'+statusChip(i.status)+'</span>'+
+   '<span>'+esc(i.category)+(i.priority==='Urgent'?' <span class="chip red">URGENT</span>':'')+(isOverdue(i)?' <span class="chip red">OVERDUE</span>':'')+'</span>'+
+   '<span class="muted">'+esc(i.description.slice(0,140))+'</span><small>Raised by '+esc(i.raisedBy)+' · '+ageTxt(i.created)+' ago'+(i.lastRemark?' · Last: '+esc(i.lastRemark.slice(0,60)):'')+'</small></button>';
+}
+function openIssue(id){
+  var i=(S.issues||[]).filter(function(x){return x.id===id})[0];if(!i)return;
+  var btns='';
+  if(S.role==='control'){btns=(i.status==='Solved'?'<button class="btn o" data-op="Reopened">Reopen</button>':'<div class="row"><button class="btn o s" data-op="Acknowledged">Acknowledge</button><button class="btn o s" data-op="In progress">In progress</button><button class="btn g s" data-op="Solved">Solved</button></div>')}
+  if(S.role==='head'){btns='<button class="btn r" data-op="Query">Ask Control Room: why not solved?</button>'+(i.status==='Solved'?'<button class="btn o" data-op="Reopened">Reopen</button>':'')}
+  var d=modal('<h2>'+esc(i.id)+' · '+esc(i.post)+'</h2><div class="row">'+statusChip(i.status)+(i.priority==='Urgent'?'<span class="chip red">URGENT</span>':'')+'<span class="muted">'+esc(i.category)+' · '+ageTxt(i.created)+' old</span></div><div>'+esc(i.description)+'</div>'+
+   (i.photo?'<a href="'+full(i.photo)+'" target="_blank" rel="noopener"><img class="th" alt="Issue photo" src="'+thumb(i.photo)+'"></a>':'')+
+   '<div class="muted">Raised by '+esc(i.raisedBy)+'</div>'+
+   (i.log&&i.log.length?'<div class="log">'+i.log.map(function(l){return '<div><b>'+esc(l.action)+'</b> · '+esc(l.by)+' ('+esc(l.role)+') · '+esc(l.time.slice(5,16))+(l.remark?'<br>'+esc(l.remark):'')+(l.photo?' <a href="'+full(l.photo)+'" target="_blank" rel="noopener">photo</a>':'')+'</div>'}).join('')+'</div>':'')+
+   '<div class="f"><label>Remark</label><textarea id="ur" placeholder="'+(S.role==='head'?'Your question to the Control Room':'What was done?')+'"></textarea></div><div class="f"><label>Photo (optional)</label><input id="uf" type="file" accept="image/*" capture="environment"></div><div class="err" id="ue"></div>'+btns+
+   '<button class="btn o s" data-op="Comment">Add comment only</button><button class="btn o" id="cl">Close</button>');
+  $('#cl',d).onclick=function(){d.remove()};
+  [].forEach.call(d.querySelectorAll('[data-op]'),function(b){b.onclick=function(){
+    var op=b.dataset.op;b.disabled=true;
+    compress($('#uf',d).files[0]).then(function(img){return call('updateIssue',{id:id,op:op,remark:$('#ur',d).value,photo:img})}).then(function(r){
+      b.disabled=false;if(!r.ok){$('#ue',d).textContent=r.error;return}
+      d.remove();toast('Updated');viewIssues()})}});
+}
+
+/* ---------- today ---------- */
+function viewToday(){
+  var m=$('#mn');m.innerHTML='<h2>Today <span class="gu">આજે</span></h2><div id="td" class="muted">Loading…</div>';
+  loadChecks().then(function(r){
+    if(!r.ok){$('#td').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
+    var cs=S.checks,bad=cs.filter(function(c){return /DOUBLE|ABSENT|NEW GUARD/.test(c.flags)});
+    var cov={Day:{},Night:{}};cs.forEach(function(c){cov[c.shift][c.post]=1});
+    var miss=function(s){return S.posts.filter(function(p){return !cov[s][p]})};
+    $('#td').outerHTML='<div id="td" style="display:flex;flex-direction:column;gap:12px">'+
+     '<div class="card"><b>Coverage</b><div>Day: '+(S.posts.length-miss('Day').length)+' of '+S.posts.length+' posts checked</div><div>Night: '+(S.posts.length-miss('Night').length)+' of '+S.posts.length+' posts checked</div>'+
+     (miss(defShift()).length?'<div class="muted">Not yet checked this '+defShift().toLowerCase()+' shift: '+esc(miss(defShift()).join(', '))+'</div>':'')+'</div>'+
+     '<div class="card"><b>Warnings ('+bad.length+')</b>'+(bad.length?bad.map(function(c){return '<div class="flag">'+esc(c.post)+' · '+c.shift+' · '+esc(c.guard||'no guard')+'<br>'+esc(c.flags)+'</div>'}).join(''):'<div class="muted">No warnings today.</div>')+'</div>'+
+     '<div class="card"><b>All checks ('+cs.length+')</b>'+(cs.length?'<table><tr><th>Time</th><th>Post</th><th>Guard</th><th>Status</th></tr>'+cs.slice().reverse().map(function(c){return '<tr><td>'+esc(c.time.slice(11,16))+'</td><td>'+esc(c.post)+'<br><span class="muted">'+c.shift+'</span></td><td>'+esc(c.guard||'—')+(c.type!=='Regular'?'<br><span class="muted">'+esc(c.type)+(c.related?': '+esc(c.related):'')+'</span>':'')+'</td><td>'+esc(c.presence)+(c.photo?' <a href="'+full(c.photo)+'" target="_blank" rel="noopener">📷</a>':'')+'</td></tr>'}).join('')+'</table>':'<div class="muted">No checks yet today.</div>')+'</div></div>';
+  });
+}
+
+/* ---------- start ---------- */
+if(store('pin')&&store('name')&&API){S.pin=store('pin');S.name=store('name');viewLogin();$('#lg').click()}else viewLogin(API?'':'Not connected yet. Setup is pending.');
+</script></body></html>
