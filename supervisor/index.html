@@ -70,7 +70,7 @@ function parseT(s){return new Date(String(s).replace(' ','T')+'+05:30')}
 function ageH(s){return (Date.now()-parseT(s).getTime())/36e5}
 function ageTxt(s){var h=ageH(s);if(h<1)return Math.max(1,Math.round(h*60))+' min';if(h<48)return Math.round(h)+' h';return Math.round(h/24)+' days'}
 function ymd(offset){var d=new Date(Date.now()+5.5*36e5+offset*864e5);return d.toISOString().slice(0,10)}
-function defShift(){var h=new Date().getHours();return (h>=7&&h<19)?'Day':'Night'}
+function defShift(){var h=new Date().getHours();return (h>=8&&h<20)?'Day':'Night'}
 function thumb(id,sz){return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w'+(sz||600)}
 function full(id){return 'https://drive.google.com/file/d/'+encodeURIComponent(id)+'/view'}
 function compress(file){return new Promise(function(res){
