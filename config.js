@@ -1,6 +1,10 @@
 /* Gate Roster Desk: live settings. Claude updates this file when timings or instructions change. */
 window.ROSTER_CONFIG={
 updated:"19 Nov 2026, 3:40 PM",
+g4Std:{
+  1:["8:35 AM","3:30 PM","8:35","3:30"],2:["8:35 AM","3:30 PM","8:35","3:30"],3:["8:35 AM","3:30 PM","8:35","3:30"],4:["8:35 AM","3:30 PM","8:35","3:30"],
+  5:["8:00 AM","3:30 PM","8:00","3:30"],6:["8:00 AM","1:45 PM","8:00","1:45"]
+},
 g4Overrides:[
   {from:"2026-11-09",to:"2026-11-11",entry:"9:45 AM",exit:"12:30 PM",entryGu:"9:45",exitGu:"12:30",
    noteEn:"Exam days (Ikhtebaar Fasle Awwal)",noteGu:"પરીક્ષાના દિવસો (ઇખ્તેબાર ફસ્લે અવ્વલ)"}

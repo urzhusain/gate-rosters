@@ -51,7 +51,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
 .gu{font-family:'Noto Sans Gujarati',var(--f)}
 </style></head><body>
 <div id="app"></div>
-<script>document.write('<script src="config.js?t='+Date.now()+'"><\/script>')</script>
+<script>document.write('<script src="config.js?t='+Date.now()+'"><\/script><script src="../config.js?t='+Date.now()+'"><\/script>')</script>
 <script>
 var API=(window.SUP_CONFIG||{}).apiUrl||'';
 var S={pin:'',name:'',role:'',posts:[],guards:[],overdue:24,tab:'',issues:null,checks:null,shift:'',filter:'',busy:false};
@@ -92,17 +92,16 @@ function viewLogin(msg){
     call('bootstrap').then(function(r){
       if(!r.ok){S.pin='';viewLogin(r.error);return}
       store('name',n);store('pin',p);S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;
-      S.shift=defShift();S.tab=r.role==='head'?'issues':(r.role==='supervisor'?'round':'issues');S.filter=r.role==='head'?'overdue':'open';
+      S.shift=defShift();S.tab='home';S.filter=r.role==='head'?'overdue':'open';
       main()})};
 }
 function logout(){S.pin='';S.role='';store('pin','');viewLogin()}
 
 /* ---------- shell ---------- */
 function tabsFor(){
-  var t=[['issues','📋','Issues'],['round','🚶','Round'],['raise','➕','Raise'],['today','✅','Today']];
-  if(S.role==='control')t=[['issues','📋','Issues'],['round','🚶','Round'],['today','✅','Today'],['report','📊','Report'],['raise','➕','Raise']];
-  if(S.role==='head')t=[['issues','📋','Issues'],['today','✅','Today'],['report','📊','Report'],['raise','➕','Raise']];
-  return t}
+  if(S.role==='control')return [['home','🏠','Home'],['issues','📋','Issues'],['round','🚶','Round'],['report','📊','Report'],['roster','🗓️','Roster']];
+  if(S.role==='head')return [['home','🏠','Home'],['issues','📋','Issues'],['report','📊','Report'],['roster','🗓️','Roster']];
+  return [['home','🏠','Home'],['round','🚶','Round'],['raise','➕','Raise'],['issues','📋','Issues'],['roster','🗓️','Roster']];}
 function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role]}
 function main(){
   var tabs=tabsFor();
@@ -110,7 +109,7 @@ function main(){
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
   $('#lo').onclick=logout;
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
-  var v={issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport}[S.tab];v();
+  var v={home:viewHome,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,roster:viewRoster}[S.tab];v();
 }
 
 /* ---------- round ---------- */
@@ -226,7 +225,7 @@ function openIssue(id){
 /* ---------- gate-wise views ---------- */
 function openIssuesByPost(){var o={};(S.issues||[]).forEach(function(i){if(i.status!=='Solved')o[i.post]=(o[i.post]||0)+1});return o}
 function viewToday(){
-  var m=$('#mn');m.innerHTML='<h2>Today by gate <span class="gu">આજે, ગેટ મુજબ</span></h2><div id="td" class="muted">Loading…</div>';
+  var m=$('#mn');m.innerHTML='<button class="btn o s" data-tab-go="home">← Home</button><h2>Today by gate <span class="gu">આજે, ગેટ મુજબ</span></h2><div id="td" class="muted">Loading…</div>';goBtns(m);
   loadChecks().then(function(r){
     if(!r.ok){$('#td').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
     var cs=S.checks,by={};cs.forEach(function(c){(by[c.post]=by[c.post]||{Day:[],Night:[]})[c.shift].push(c)});
@@ -268,6 +267,72 @@ function viewReport(){
       var d=modal('<h2>'+esc(r.p)+'</h2><div class="muted">'+r0[0]+' to '+r0[1]+'</div>'+(r.cs.length?'<table><tr><th>Date</th><th>Shift</th><th>Status</th><th>Guard</th></tr>'+r.cs.slice().reverse().map(function(c){return '<tr><td>'+esc(c.date.slice(5))+'</td><td>'+c.shift+'</td><td>'+esc(c.presence)+(c.type!=='Regular'?'<br><span class="muted">'+esc(c.type)+'</span>':'')+'</td><td>'+esc(c.guard||'—')+(/DOUBLE/.test(c.flags)?'<br><span class="chip red">Double duty</span>':'')+'</td></tr>'}).join('')+'</table>':'<div class="muted">No checks in this period.</div>')+'<button class="btn o" id="cx">Close</button>');
       $('#cx',d).onclick=function(){d.remove()}}});
   });
+}
+
+/* ---------- dashboards ---------- */
+function rosterToday(){
+  var R=window.ROSTER_CONFIG||{},iso=ymd(0),d=new Date(iso+'T12:00:00'),out={g4:null,progs:[],notes:[],updated:R.updated||''};
+  var ov=(R.g4Overrides||[]).filter(function(x){return iso>=x.from&&iso<=x.to})[0];
+  if(ov)out.g4={entry:ov.entry,exit:ov.exit,note:ov.noteEn};
+  else{var s=(R.g4Std||{})[d.getDay()];if(s)out.g4={entry:s[0],exit:s[1],note:''}}
+  var GN={g1:'Gate 1',g4:'Gate 4',g6:'Gate 6',g8:'Gate 8',m7:'Gates 7A & 7B',mf:'Masakin front',mb:'Masakin back',rm:'Raj Manzil',ys:'Yusufi',sv:'Supervisor'};
+  (R.programs||[]).forEach(function(p){if(iso>=p.from&&iso<=p.to)out.progs.push({gate:GN[p.gate]||p.gate,en:p.en,time:p.time[0],people:p.people[0],pass:p.pass[0]})});
+  (R.notes||[]).forEach(function(n){if(iso>=n.from&&iso<=n.to)out.notes.push({gates:n.gates==='all'?'All gates':n.gates.map(function(g){return GN[g]||g}).join(', '),en:n.en})});
+  return out}
+function rosterCard(){
+  var t=rosterToday(),h='<div class="card"><div class="row" style="justify-content:space-between"><b>Today\'s instructions</b><button class="btn o s" data-tab-go="roster">Open roster</button></div>';
+  h+=t.g4?'<div><span class="chip">Gate 4</span> Entry closes <b>'+esc(t.g4.entry)+'</b> · Exit opens <b>'+esc(t.g4.exit)+'</b>'+(t.g4.note?' <span class="muted">('+esc(t.g4.note)+')</span>':'')+'</div>':'<div class="muted">No standard Gate 4 timing today. Check with Tanzeem Office.</div>';
+  t.progs.forEach(function(p){h+='<div><span class="chip yel">Program</span> '+esc(p.gate)+': '+esc(p.en)+' · '+esc(p.time)+' · '+esc(p.people)+' · '+esc(p.pass)+'</div>'});
+  t.notes.forEach(function(n){h+='<div class="flag" style="margin-top:2px"><b>NEW INSTRUCTION</b> ('+esc(n.gates)+'): '+esc(n.en)+'</div>'});
+  if(!t.progs.length&&!t.notes.length)h+='<div class="muted">No special programs or new instructions today.</div>';
+  return h+'<div class="muted">Roster updated: '+esc(t.updated||'standard')+'</div></div>'}
+function tile(label,val,cls){return '<div class="card" style="flex:1;min-width:130px;gap:2px"><div class="muted">'+esc(label)+'</div><div style="font-size:30px;font-weight:800;line-height:1.1" class="'+(cls||'')+'">'+val+'</div></div>'}
+function bars(items,cls){var m=Math.max.apply(null,items.map(function(i){return i[1]}).concat([1]));return items.map(function(i){return '<div style="display:flex;align-items:center;gap:8px"><span style="width:120px;font-size:13.5px">'+esc(i[0])+'</span><span style="flex:1;background:var(--line);border-radius:99px;height:10px;overflow:hidden"><span style="display:block;height:100%;width:'+Math.round(i[1]/m*100)+'%;background:var(--'+(cls||'navy')+')"></span></span><b style="width:26px;text-align:right">'+i[1]+'</b></div>'}).join('')}
+function covLine(label,n,total){var pc=total?Math.round(n/total*100):0;return '<div><div class="row" style="justify-content:space-between"><span>'+label+'</span><b>'+n+' of '+total+'</b></div><div style="background:var(--line);border-radius:99px;height:10px;overflow:hidden"><div style="height:100%;width:'+pc+'%;background:var(--'+(pc===100?'grn':'navy')+')"></div></div></div>'}
+function goBtns(root){[].forEach.call(root.querySelectorAll('[data-tab-go]'),function(b){b.onclick=function(){S.tab=b.dataset.tabGo;main()}});[].forEach.call(root.querySelectorAll('[data-issue]'),function(b){b.onclick=function(){openIssue(b.dataset.issue)}})}
+function issueLine(i){return '<button class="post" data-issue="'+esc(i.id)+'" style="padding:10px"><span><b>'+esc(i.id)+' · '+esc(i.post)+'</b><small>'+esc(i.category)+' · '+ageTxt(i.created)+' ago'+(i.lastRemark?' · '+esc(i.lastRemark.slice(0,50)):'')+'</small></span>'+statusChip(i.status)+'</button>'}
+function viewHome(){
+  var m=$('#mn');
+  m.innerHTML='<h2>'+({supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role])+' dashboard <span class="gu">ડેશબોર્ડ</span></h2><div id="hm" class="muted">Loading…</div>';
+  var wk=S.role==='head'?[ymd(-6),ymd(0)]:null;
+  var calls=[loadChecks(),call('issues')];if(wk)calls.push(call('checks',{from:wk[0],to:wk[1]}));
+  Promise.all(calls).then(function(rs){
+    if(!rs[0].ok||!rs[1].ok){$('#hm').innerHTML='<span class="err">'+esc(rs[0].ok?rs[1].error:rs[0].error)+'</span>';return}
+    S.issues=rs[1].issues;var cs=S.checks,all=S.issues,openI=all.filter(function(i){return i.status!=='Solved'}),od=all.filter(isOverdue);
+    var covOf=function(sh){var o={};cs.forEach(function(c){if(c.shift===sh)o[c.post]=1});return o};
+    var cd=covOf('Day'),cn=covOf('Night'),nd=Object.keys(cd).length,nn=Object.keys(cn).length,sh=defShift(),cur=sh==='Day'?cd:cn;
+    var warn=cs.filter(function(c){return /DOUBLE|ABSENT|NEW GUARD/.test(c.flags)});
+    var html='';
+    if(S.role==='supervisor'){
+      var todo=S.posts.filter(function(p){return !cur[p]}),mine=openI.filter(function(i){return i.raisedBy===S.name});
+      html+='<div class="card"><b>Round progress · '+sh+' shift</b>'+covLine(sh+' shift',S.posts.length-todo.length,S.posts.length)+
+        (todo.length?'<div class="muted">Still to check:</div><div class="row">'+todo.slice(0,6).map(function(p){return '<button class="chip yel" style="border:0;font:inherit;font-weight:800" data-chk="'+esc(p)+'">'+esc(p)+'</button>'}).join('')+(todo.length>6?'<span class="muted">+'+(todo.length-6)+' more</span>':'')+'</div>':'<div class="flag ok">All gates checked this shift.</div>')+
+        '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+
+        '<div class="card"><b>My open issues ('+mine.length+')</b>'+(mine.length?mine.slice(0,4).map(issueLine).join(''):'<div class="muted">None. Everything you raised is solved.</div>')+'</div>'+rosterCard();
+    }else if(S.role==='control'){
+      var un=openI.filter(function(i){return i.status==='Open'}),urg=openI.filter(function(i){return i.priority==='Urgent'});
+      html+='<div class="row">'+tile('Open issues',openI.length)+tile('Overdue',od.length,od.length?'err':'')+'</div><div class="row">'+tile('Not acknowledged',un.length,un.length?'err':'')+tile('Urgent',urg.length,urg.length?'err':'')+'</div>'+
+        '<div class="card"><b>Needs action now</b>'+((un.concat(od.filter(function(i){return un.indexOf(i)<0}))).slice(0,5).map(issueLine).join('')||'<div class="muted">Nothing waiting.</div>')+'<button class="btn o s" data-tab-go="issues">All issues</button></div>'+
+        '<div class="card"><b>Coverage today</b>'+covLine('Day',nd,S.posts.length)+covLine('Night',nn,S.posts.length)+(S.posts.filter(function(p){return !cur[p]}).length?'<div class="muted">Not yet checked ('+sh.toLowerCase()+'): '+esc(S.posts.filter(function(p){return !cur[p]}).join(', '))+'</div>':'')+'<button class="btn o s" data-tab-go="today">See today by gate</button></div>'+
+        '<div class="card"><b>Warnings today ('+warn.length+')</b>'+(warn.length?warn.slice(0,6).map(function(c){return '<div class="flag">'+esc(c.post)+' · '+c.shift+' · '+esc(c.guard||'no guard')+'<br>'+esc(c.flags)+'</div>'}).join(''):'<div class="muted">No warnings today.</div>')+'</div>'+rosterCard();
+    }else{
+      var wc=rs[2].ok?rs[2].checks:[],ab=wc.filter(function(c){return c.presence==='Absent'}),db=wc.filter(function(c){return /DOUBLE/.test(c.flags)});
+      var by=function(list){var o={};list.forEach(function(c){o[c.post]=(o[c.post]||0)+1});return Object.keys(o).map(function(k){return [k,o[k]]}).sort(function(a,b){return b[1]-a[1]}).slice(0,6)};
+      var og={};openI.forEach(function(i){og[i.post]=(og[i.post]||0)+1});var ogl=Object.keys(og).map(function(k){return [k,og[k]]}).sort(function(a,b){return b[1]-a[1]}).slice(0,6);
+      html+='<div class="row">'+tile('Overdue issues',od.length,od.length?'err':'')+tile('Open issues',openI.length)+'</div><div class="row">'+tile('Absent, last 7 days',ab.length,ab.length?'err':'')+tile('Double duty, 7 days',db.length,db.length?'err':'')+'</div>'+
+        '<div class="card"><b>Unsolved for more than '+S.overdue+' hours</b>'+(od.length?od.slice(0,6).map(issueLine).join('')+'<div class="muted">Tap an issue to ask the Control Room why it is not solved.</div>':'<div class="flag ok">Nothing overdue.</div>')+'</div>'+
+        '<div class="card"><b>Open issues by gate</b>'+(ogl.length?bars(ogl,'red'):'<div class="muted">None.</div>')+'</div>'+
+        '<div class="card"><b>Absences by gate (7 days)</b>'+(ab.length?bars(by(ab),'red'):'<div class="muted">None.</div>')+'</div>'+
+        '<div class="card"><b>Coverage today</b>'+covLine('Day',nd,S.posts.length)+covLine('Night',nn,S.posts.length)+'</div>'+rosterCard()+
+        '<div class="row"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>';
+    }
+    $('#hm').outerHTML='<div id="hm" style="display:flex;flex-direction:column;gap:12px">'+html+'</div>';
+    var root=$('#hm');goBtns(root);
+    [].forEach.call(root.querySelectorAll('[data-chk]'),function(b){b.onclick=function(){S.shift=sh;openCheck(b.dataset.chk)}});
+  });
+}
+function viewRoster(){
+  $('#mn').innerHTML='<div class="row" style="justify-content:space-between"><h2>Roster <span class="gu">રોસ્ટર</span></h2><a class="btn o s" style="text-decoration:none" href="../" target="_blank" rel="noopener">Open full page</a></div><div class="muted">Pick days and gates, then Download PDF.</div><iframe src="../?v='+Date.now()+'" title="Gate rosters" style="width:100%;height:calc(100vh - 230px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe>';
 }
 
 /* ---------- start ---------- */

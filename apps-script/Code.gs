@@ -120,7 +120,7 @@ function doPost(e) {
       case 'bootstrap': return json_(bootstrap_(role));
       case 'addGuard': return json_(addGuard_(q, by, role));
       case 'submitCheck': return json_(submitCheck_(q, by, role));
-      case 'raiseIssue': return json_(raiseIssue_(q, by));
+      case 'raiseIssue': return json_(raiseIssue_(q, by, role));
       case 'issues': return json_(listIssues_());
       case 'updateIssue': return json_(updateIssue_(q, by, role));
       case 'checks': return json_(listChecks_(q.from || q.date || today_(), q.to || q.from || q.date || today_()));
@@ -204,7 +204,7 @@ function submitCheck_(q, by, role) {
   return { ok: true, flags: flags };
 }
 
-function raiseIssue_(q, by) {
+function raiseIssue_(q, by, role) {
   var desc = String(q.description || '').trim();
   if (desc.length < 3) return { ok: false, error: 'Write what the issue is' };
   var n = rows_('Issues').length + 1, id = 'I-' + ('0000' + n).slice(-4), t = now_();
@@ -212,7 +212,7 @@ function raiseIssue_(q, by) {
     ID: id, Created: t, Post: q.post || '', Category: q.category || 'Other', Priority: q.priority === 'Urgent' ? 'Urgent' : 'Normal',
     Description: desc.slice(0, 800), PhotoId: photo_(q.photo, 'issue_' + id), RaisedBy: by, Status: 'Open', LastRemark: '', Updated: t, SolvedAt: ''
   });
-  add_('Log', { Time: t, IssueID: id, By: by, Role: 'supervisor', Action: 'Raised', Remark: desc.slice(0, 200) });
+  add_('Log', { Time: t, IssueID: id, By: by, Role: role, Action: 'Raised', Remark: desc.slice(0, 200) });
   return { ok: true, id: id };
 }
 
