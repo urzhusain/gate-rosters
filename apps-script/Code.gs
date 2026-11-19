@@ -119,7 +119,7 @@ function doPost(e) {
       case 'raiseIssue': return json_(raiseIssue_(q, by));
       case 'issues': return json_(listIssues_());
       case 'updateIssue': return json_(updateIssue_(q, by, role));
-      case 'checks': return json_(listChecks_(q.date || today_()));
+      case 'checks': return json_(listChecks_(q.from || q.date || today_(), q.to || q.from || q.date || today_()));
       default: return json_({ ok: false, error: 'Unknown action' });
     }
   } catch (err) {
@@ -247,10 +247,12 @@ function updateIssue_(q, by, role) {
   return { ok: true };
 }
 
-function listChecks_(date) {
-  var rs = rows_('Checks').filter(function (c) { return c.Date === date; }).map(function (c) {
+function listChecks_(from, to) {
+  var span = (new Date(to) - new Date(from)) / 864e5;
+  if (isNaN(span) || span < 0 || span > 62) return { ok: false, error: 'Choose a period of up to 62 days' };
+  var rs = rows_('Checks').filter(function (c) { return c.Date >= from && c.Date <= to; }).map(function (c) {
     return { time: c.Time, date: c.Date, shift: c.Shift, post: c.Post, guardId: c.GuardId, guard: c.Guard, presence: c.Presence,
       type: c.Type, related: c.Related, remark: c.Remark, photo: c.PhotoId, by: c.By, flags: c.Flags };
   });
-  return { ok: true, date: date, checks: rs };
+  return { ok: true, from: from, to: to, checks: rs };
 }

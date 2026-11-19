@@ -69,6 +69,7 @@ function nowIST(){return new Date()}
 function parseT(s){return new Date(String(s).replace(' ','T')+'+05:30')}
 function ageH(s){return (Date.now()-parseT(s).getTime())/36e5}
 function ageTxt(s){var h=ageH(s);if(h<1)return Math.max(1,Math.round(h*60))+' min';if(h<48)return Math.round(h)+' h';return Math.round(h/24)+' days'}
+function ymd(offset){var d=new Date(Date.now()+5.5*36e5+offset*864e5);return d.toISOString().slice(0,10)}
 function defShift(){var h=new Date().getHours();return (h>=7&&h<19)?'Day':'Night'}
 function thumb(id,sz){return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w'+(sz||600)}
 function full(id){return 'https://drive.google.com/file/d/'+encodeURIComponent(id)+'/view'}
@@ -99,7 +100,8 @@ function logout(){S.pin='';S.role='';store('pin','');viewLogin()}
 /* ---------- shell ---------- */
 function tabsFor(){
   var t=[['issues','📋','Issues'],['round','🚶','Round'],['raise','➕','Raise'],['today','✅','Today']];
-  if(S.role==='head')t=[['issues','📋','Issues'],['today','✅','Today'],['raise','➕','Raise']];
+  if(S.role==='control')t=[['issues','📋','Issues'],['round','🚶','Round'],['today','✅','Today'],['report','📊','Report'],['raise','➕','Raise']];
+  if(S.role==='head')t=[['issues','📋','Issues'],['today','✅','Today'],['report','📊','Report'],['raise','➕','Raise']];
   return t}
 function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role]}
 function main(){
@@ -108,7 +110,7 @@ function main(){
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
   $('#lo').onclick=logout;
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
-  var v={issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday}[S.tab];v();
+  var v={issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport}[S.tab];v();
 }
 
 /* ---------- round ---------- */
@@ -124,7 +126,7 @@ function viewRound(){
     [].forEach.call(m.querySelectorAll('[data-p]'),function(b){b.onclick=function(){openCheck(b.dataset.p)}});
   });
 }
-function loadChecks(){return call('checks').then(function(r){if(r.ok)S.checks=r.checks;else toast(r.error);return r})}
+function loadChecks(from,to){return call('checks',{from:from||ymd(0),to:to||from||ymd(0)}).then(function(r){if(r.ok)S.checks=r.checks;else toast(r.error);return r})}
 function modal(html){var d=document.createElement('div');d.className='modal';d.innerHTML='<div class="sheet">'+html+'</div>';d.onclick=function(e){if(e.target===d)d.remove()};document.body.appendChild(d);return d}
 function openCheck(post){
   var gs=S.guards.slice().sort(function(a,b){return a.name.localeCompare(b.name)});
@@ -221,19 +223,50 @@ function openIssue(id){
       d.remove();toast('Updated');viewIssues()})}});
 }
 
-/* ---------- today ---------- */
+/* ---------- gate-wise views ---------- */
+function openIssuesByPost(){var o={};(S.issues||[]).forEach(function(i){if(i.status!=='Solved')o[i.post]=(o[i.post]||0)+1});return o}
 function viewToday(){
-  var m=$('#mn');m.innerHTML='<h2>Today <span class="gu">આજે</span></h2><div id="td" class="muted">Loading…</div>';
+  var m=$('#mn');m.innerHTML='<h2>Today by gate <span class="gu">આજે, ગેટ મુજબ</span></h2><div id="td" class="muted">Loading…</div>';
   loadChecks().then(function(r){
     if(!r.ok){$('#td').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
-    var cs=S.checks,bad=cs.filter(function(c){return /DOUBLE|ABSENT|NEW GUARD/.test(c.flags)});
-    var cov={Day:{},Night:{}};cs.forEach(function(c){cov[c.shift][c.post]=1});
-    var miss=function(s){return S.posts.filter(function(p){return !cov[s][p]})};
-    $('#td').outerHTML='<div id="td" style="display:flex;flex-direction:column;gap:12px">'+
-     '<div class="card"><b>Coverage</b><div>Day: '+(S.posts.length-miss('Day').length)+' of '+S.posts.length+' posts checked</div><div>Night: '+(S.posts.length-miss('Night').length)+' of '+S.posts.length+' posts checked</div>'+
-     (miss(defShift()).length?'<div class="muted">Not yet checked this '+defShift().toLowerCase()+' shift: '+esc(miss(defShift()).join(', '))+'</div>':'')+'</div>'+
-     '<div class="card"><b>Warnings ('+bad.length+')</b>'+(bad.length?bad.map(function(c){return '<div class="flag">'+esc(c.post)+' · '+c.shift+' · '+esc(c.guard||'no guard')+'<br>'+esc(c.flags)+'</div>'}).join(''):'<div class="muted">No warnings today.</div>')+'</div>'+
-     '<div class="card"><b>All checks ('+cs.length+')</b>'+(cs.length?'<table><tr><th>Time</th><th>Post</th><th>Guard</th><th>Status</th></tr>'+cs.slice().reverse().map(function(c){return '<tr><td>'+esc(c.time.slice(11,16))+'</td><td>'+esc(c.post)+'<br><span class="muted">'+c.shift+'</span></td><td>'+esc(c.guard||'—')+(c.type!=='Regular'?'<br><span class="muted">'+esc(c.type)+(c.related?': '+esc(c.related):'')+'</span>':'')+'</td><td>'+esc(c.presence)+(c.photo?' <a href="'+full(c.photo)+'" target="_blank" rel="noopener">📷</a>':'')+'</td></tr>'}).join('')+'</table>':'<div class="muted">No checks yet today.</div>')+'</div></div>';
+    var cs=S.checks,by={};cs.forEach(function(c){(by[c.post]=by[c.post]||{Day:[],Night:[]})[c.shift].push(c)});
+    var cov=function(s){return S.posts.filter(function(p){return by[p]&&by[p][s].length}).length};
+    var line=function(list){
+      if(!list.length)return '<span class="chip yel">Not checked</span>';
+      return list.map(function(c){var bad=/DOUBLE|ABSENT|NEW GUARD/.test(c.flags);
+        return '<div>'+'<span class="chip '+(c.presence==='Absent'?'red':c.presence==='Late'?'yel':'grn')+'">'+esc(c.presence)+'</span> '+esc(c.guard||'No guard')+(c.type!=='Regular'?' <span class="muted">· '+esc(c.type)+(c.related?': '+esc(c.related):'')+'</span>':'')+' <span class="muted">'+esc(c.time.slice(11,16))+'</span>'+(c.photo?' <a href="'+full(c.photo)+'" target="_blank" rel="noopener">📷</a>':'')+(bad?'<div class="flag" style="margin-top:4px">'+esc(c.flags)+'</div>':'')+'</div>'}).join('')};
+    $('#td').outerHTML='<div id="td" style="display:flex;flex-direction:column;gap:12px"><div class="card"><b>Coverage</b><div>Day: '+cov('Day')+' of '+S.posts.length+' gates checked</div><div>Night: '+cov('Night')+' of '+S.posts.length+' gates checked</div></div>'+
+     S.posts.map(function(p){var g=by[p]||{Day:[],Night:[]},warn=g.Day.concat(g.Night).some(function(c){return /DOUBLE|ABSENT/.test(c.flags)});
+       return '<div class="card" style="'+(warn?'border-color:var(--red)':'')+'"><b>'+esc(p)+'</b><div><span class="muted">Day</span><br>'+line(g.Day)+'</div><div><span class="muted">Night</span><br>'+line(g.Night)+'</div></div>'}).join('')+'</div>';
+  });
+}
+function periodRange(k){
+  if(k==='7')return [ymd(-6),ymd(0)];if(k==='30')return [ymd(-29),ymd(0)];
+  if(k==='month'){var d=ymd(0);return [d.slice(0,8)+'01',d]}
+  if(k==='last'){var t=new Date(Date.now()+5.5*36e5);var f=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth()-1,1)),l=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),0));return [f.toISOString().slice(0,10),l.toISOString().slice(0,10)]}
+  return [ymd(0),ymd(0)]}
+function viewReport(){
+  var m=$('#mn'),pk=S.period||'30';
+  m.innerHTML='<h2>Gate report <span class="gu">ગેટ મુજબ રિપોર્ટ</span></h2><div class="f"><label>Period</label><select id="pk"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="month">This month</option><option value="last">Last month</option></select></div><div id="rp" class="muted">Loading…</div>';
+  $('#pk').value=pk;$('#pk').onchange=function(){S.period=this.value;viewReport()};
+  var r0=periodRange(pk);
+  Promise.all([loadChecks(r0[0],r0[1]),call('issues')]).then(function(rs){
+    if(!rs[0].ok){$('#rp').innerHTML='<span class="err">'+esc(rs[0].error)+'</span>';return}
+    if(rs[1].ok)S.issues=rs[1].issues;
+    var op=openIssuesByPost(),rows=S.posts.map(function(p){
+      var cs=S.checks.filter(function(c){return c.post===p}),n=function(f){return cs.filter(f).length};
+      var slots={};cs.forEach(function(c){slots[c.date+c.shift]=1});
+      return {p:p,slots:Object.keys(slots).length,abs:n(function(c){return c.presence==='Absent'}),late:n(function(c){return c.presence==='Late'}),
+        tmp:n(function(c){return c.type==='Temporary'}),perm:n(function(c){return c.type==='Permanent'}),rot:n(function(c){return c.type==='Rotation'}),
+        dbl:n(function(c){return /DOUBLE/.test(c.flags)}),open:op[p]||0,cs:cs}});
+    var tot=function(k){return rows.reduce(function(a,r){return a+r[k]},0)};
+    $('#rp').outerHTML='<div id="rp" style="display:flex;flex-direction:column;gap:12px"><div class="card"><b>'+r0[0]+' to '+r0[1]+'</b><div class="muted">'+tot('slots')+' gate-shifts checked · '+tot('abs')+' absent · '+tot('late')+' late · '+tot('tmp')+' temporary · '+tot('perm')+' permanent · '+tot('rot')+' rotation · '+tot('dbl')+' double-duty warnings</div></div>'+
+     '<div class="card" style="overflow:auto"><table><tr><th>Gate</th><th>Shifts checked</th><th>Absent</th><th>Late</th><th>Temp</th><th>Perm</th><th>Rot</th><th>Double</th><th>Open issues</th></tr>'+
+     rows.map(function(r){return '<tr data-g="'+esc(r.p)+'" style="cursor:pointer"><td><b>'+esc(r.p)+'</b></td><td>'+r.slots+'</td><td>'+(r.abs?'<span class="chip red">'+r.abs+'</span>':'0')+'</td><td>'+r.late+'</td><td>'+r.tmp+'</td><td>'+r.perm+'</td><td>'+r.rot+'</td><td>'+(r.dbl?'<span class="chip red">'+r.dbl+'</span>':'0')+'</td><td>'+r.open+'</td></tr>'}).join('')+'</table><div class="muted">Tap a gate to see each day.</div></div></div>';
+    [].forEach.call(document.querySelectorAll('tr[data-g]'),function(tr){tr.onclick=function(){
+      var r=rows.filter(function(x){return x.p===tr.dataset.g})[0];
+      var d=modal('<h2>'+esc(r.p)+'</h2><div class="muted">'+r0[0]+' to '+r0[1]+'</div>'+(r.cs.length?'<table><tr><th>Date</th><th>Shift</th><th>Status</th><th>Guard</th></tr>'+r.cs.slice().reverse().map(function(c){return '<tr><td>'+esc(c.date.slice(5))+'</td><td>'+c.shift+'</td><td>'+esc(c.presence)+(c.type!=='Regular'?'<br><span class="muted">'+esc(c.type)+'</span>':'')+'</td><td>'+esc(c.guard||'—')+(/DOUBLE/.test(c.flags)?'<br><span class="chip red">Double duty</span>':'')+'</td></tr>'}).join('')+'</table>':'<div class="muted">No checks in this period.</div>')+'<button class="btn o" id="cx">Close</button>');
+      $('#cx',d).onclick=function(){d.remove()}}});
   });
 }
 
