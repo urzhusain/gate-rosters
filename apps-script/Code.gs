@@ -448,8 +448,30 @@ function addAlert_(type, key, level, msg, aud) {
   var last = sh.getLastRow(), from = Math.max(2, last - 400);
   if (last >= 2 && sh.getRange(from, 3, last - from + 1, 1).getValues().some(function (r) { return String(r[0]) === key; })) return false;
   add_('Alerts', { Time: now_(), Type: type, Key: key, Level: level, Message: msg, Audience: aud });
+  if (level === 'high') emailAlert_(msg);
   return true;
 }
+/** Emails important alerts to the address(es) in Settings > alert_email. Never lets an email problem break the app. */
+function emailAlert_(msg) {
+  try {
+    var st = settings_(), to = String(st.alert_email || '').trim();
+    if (!to) return;
+    var day = today_(), cnt = (st.mail_day === day ? Number(st.mail_count) || 0 : 0);
+    if (cnt >= 40) return;
+    MailApp.sendEmail({ to: to, subject: 'Security alert: ' + msg.slice(0, 90), body: msg + '\n\nOpen the Security Control app to see everything:\nhttps://urzhusain.github.io/gate-rosters/supervisor/\n\n(Automatic message from Aljamea Security Control.)' });
+    setSetting_('mail_day', day); setSetting_('mail_count', String(cnt + 1));
+  } catch (e) {}
+}
+/** Run ONCE from the editor. Approves email + timer permission, sets the alert address and starts the 10-minute check. */
+function installAlerts() {
+  if (!settings_().alert_email) setSetting_('alert_email', 'urzhusain@gmail.com');
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'alertTickAuto') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('alertTickAuto').timeBased().everyMinutes(10).create();
+  MailApp.sendEmail({ to: settings_().alert_email, subject: 'Security alerts are switched on', body: 'This is a test message. From now on you will get an email here when a round is missed, an issue is not acknowledged or is overdue, or a guard is found absent.\n\nApp: https://urzhusain.github.io/gate-rosters/supervisor/' });
+  return 'ok';
+}
+/** Runs every 10 minutes by itself, even when nobody has the app open. */
+function alertTickAuto() { alertTick_(); }
 /** Looks for problems nobody has reported: missed rounds, unacknowledged and overdue issues. Runs at most every 4 minutes, whenever the app is used. */
 function alertTick_() {
   var st = settings_(), nowT = new Date().getTime();
