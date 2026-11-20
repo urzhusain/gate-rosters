@@ -112,8 +112,8 @@ function compress(file){return new Promise(function(res){
 
 /* ---------- login ---------- */
 function viewLogin(msg){
-  $('#app').innerHTML='<main><div class="hero"><img class="logo-l" src="../assets/logo.png" alt="Siyanat Al Mumtalakat"><img class="logo-d" src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><h1>Security Control</h1><p>Aljamea-tus-Saifiyah</p></div><div class="card"><h2>Sign in <span class="gu">સાઇન ઇન</span></h2>'+
-  '<div class="f"><label for="pn">Your personal PIN <span class="gu">તમારો અંગત પિન</span></label><input id="pn" type="password" inputmode="numeric" autocomplete="current-password" value="'+esc(store('pin')||'')+'"></div>'+
+  $('#app').innerHTML='<main><div class="hero"><img class="logo-l" src="../assets/logo.png" alt="Siyanat Al Mumtalakat"><img class="logo-d" src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><h1>Security Control</h1><p>Aljamea-tus-Saifiyah</p></div><div class="card"><h2>Sign in</h2>'+
+  '<div class="f"><label for="pn">Your personal PIN</label><input id="pn" type="password" inputmode="numeric" autocomplete="current-password" value="'+esc(store('pin')||'')+'"></div>'+
   '<div class="err" id="le">'+esc(msg||'')+'</div><button class="btn" id="lg">Sign in</button></div></main>';
   $('#lg').onclick=function(){
     var p=$('#pn').value.trim();
@@ -139,13 +139,13 @@ function main(){
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
   $('#lo').onclick=logout;
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
-  var v={home:viewHome,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster}[S.tab];v();
+  var v={home:viewHome,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster}[S.tab];$('#mn').classList.remove('wide');v();
 }
 
 /* ---------- round ---------- */
 function viewRound(){
   var m=$('#mn');
-  m.innerHTML='<h2>Round <span class="gu">રાઉન્ડ</span></h2><div class="seg" id="sg"><button data-s="Day" aria-pressed="'+(S.shift==='Day')+'">Day</button><button data-s="Night" aria-pressed="'+(S.shift==='Night')+'">Night</button></div><div id="pl" class="muted">Loading…</div>';
+  m.innerHTML='<h2>Round</h2><div class="seg" id="sg"><button data-s="Day" aria-pressed="'+(S.shift==='Day')+'">Day</button><button data-s="Night" aria-pressed="'+(S.shift==='Night')+'">Night</button></div><div id="pl" class="muted">Loading…</div>';
   [].forEach.call(m.querySelectorAll('[data-s]'),function(b){b.onclick=function(){S.shift=b.dataset.s;viewRound()}});
   loadChecks().then(function(){
     var done={};(S.checks||[]).filter(function(c){return c.shift===S.shift}).forEach(function(c){done[c.post]=(done[c.post]||0)+1});
@@ -221,7 +221,7 @@ function openCheck(post){
 function viewRaise(){
   var pf=S.prefill||{};S.prefill=null;
   var cam=S.role==='control';if(cam&&!pf.category)pf.category='Suspicious activity (seen on camera)';
-  $('#mn').innerHTML='<h2>'+(cam?'Report from cameras <span class="gu">કેમેરા પરથી જાણ</span>':'Raise an issue <span class="gu">ફરિયાદ નોંધાવો</span>')+'</h2><div class="card">'+
+  $('#mn').innerHTML='<h2>'+(cam?'Report from cameras':'Raise an issue')+'</h2><div class="card">'+
   '<div class="f"><label>Where?</label><select id="rp">'+S.posts.concat(['Other / whole campus']).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>What kind?</label><select id="rc">'+CATS.filter(function(c){return cam||S.role==='head'||c!==CAMCAT}).map(function(c){return '<option'+(pf.category===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>How urgent?</label><div class="seg" id="up"><button data-u="Normal" aria-pressed="true">Normal</button><button data-u="Urgent" aria-pressed="false">Urgent</button></div></div>'+
@@ -242,7 +242,7 @@ function viewRaise(){
       var CR=((window.SUP_CONFIG||{}).controlWhatsapp||'').replace(/\D/g,'');
       var msg=(urg==='Urgent'?'URGENT - ':'')+'Issue '+r.id+'\n'+$('#rp').value+' - '+$('#rc').value+'\n'+($('#rd').value||'(no details)')+'\nRaised by '+S.name+(window._ri?'\n(photo is in the app)':'');
       var wa='https://wa.me/'+(CR.length===10?'91'+CR:CR)+'?text='+encodeURIComponent(msg);
-      var d=modal('<h2>Issue '+esc(r.id)+' raised <span class="gu">નોંધાઈ ગઈ</span></h2><p>It is now in the Control Room list. Tap below to also alert the Control Room manager on WhatsApp.</p>'+
+      var d=modal('<h2>Issue '+esc(r.id)+' raised</h2><p>It is now in the Control Room list. Tap below to also alert the Control Room manager on WhatsApp.</p>'+
         '<a class="btn g" id="wa" href="'+wa+'" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;display:block">Send on WhatsApp</a>'+
         '<button class="btn o" id="wd">Done</button>');
       $('#wd',d).onclick=function(){d.remove();S.tab='issues';S.filter='open';main()};
@@ -254,7 +254,7 @@ function viewRaise(){
 function isOverdue(i){return i.status!=='Solved'&&ageH(i.created)>=S.overdue}
 function viewIssues(){
   var m=$('#mn');
-  m.innerHTML='<h2>Issues <span class="gu">ફરિયાદો</span></h2><div class="seg" id="fl"><button data-f="overdue">Overdue</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
+  m.innerHTML='<h2>Issues</h2><div class="seg" id="fl"><button data-f="overdue">Overdue</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
   [].forEach.call(m.querySelectorAll('[data-f]'),function(b){b.setAttribute('aria-pressed',S.filter===b.dataset.f);b.onclick=function(){S.filter=b.dataset.f;renderIssues();[].forEach.call(m.querySelectorAll('[data-f]'),function(x){x.setAttribute('aria-pressed',S.filter===x.dataset.f)})}});
   call('issues').then(function(r){if(!r.ok){$('#il').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}S.issues=vis(r.issues);renderIssues()});
 }
@@ -303,7 +303,7 @@ function openIssue(id){
 /* ---------- gate-wise views ---------- */
 function openIssuesByPost(){var o={};(S.issues||[]).forEach(function(i){if(i.status!=='Solved')o[i.post]=(o[i.post]||0)+1});return o}
 function viewToday(){
-  var m=$('#mn');m.innerHTML='<button class="btn o s" data-tab-go="home">← Home</button><h2>Today by gate <span class="gu">આજે, ગેટ મુજબ</span></h2><div id="td" class="muted">Loading…</div>';goBtns(m);
+  var m=$('#mn');m.innerHTML='<button class="btn o s" data-tab-go="home">← Home</button><h2>Today by gate</h2><div id="td" class="muted">Loading…</div>';goBtns(m);
   loadChecks().then(function(r){
     if(!r.ok){$('#td').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
     var cs=S.checks,by={};cs.forEach(function(c){(by[c.post]=by[c.post]||{Day:[],Night:[]})[c.shift].push(c)});
@@ -318,7 +318,7 @@ function viewToday(){
   });
 }
 function viewGuards(){
-  var m=$('#mn');m.innerHTML='<button class="btn o s" data-tab-go="home">← Home</button><h2>Guards <span class="gu">ગાર્ડ</span></h2><div class="f"><input id="gq" placeholder="Search name or number"></div><div id="gl" class="muted">Loading…</div>';goBtns(m);
+  var m=$('#mn');m.innerHTML='<button class="btn o s" data-tab-go="home">← Home</button><h2>Guards</h2><div class="f"><input id="gq" placeholder="Search name or number"></div><div id="gl" class="muted">Loading…</div>';goBtns(m);
   call('bootstrap').then(function(b){if(b.ok&&b.guards)S.guards=b.guards;return call('checks',{from:ymd(-29),to:ymd(0)})}).then(function(r){
     if(!r.ok){$('#gl').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
     var last={},cnt={},bad={};
@@ -341,7 +341,7 @@ function periodRange(k){
   return [ymd(0),ymd(0)]}
 function viewReport(){
   var m=$('#mn'),pk=S.period||'30';
-  m.innerHTML='<h2>Gate report <span class="gu">ગેટ મુજબ રિપોર્ટ</span></h2><div class="f"><label>Period</label><select id="pk"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="month">This month</option><option value="last">Last month</option></select></div><div id="rp" class="muted">Loading…</div>';
+  m.innerHTML='<h2>Gate report</h2><div class="f"><label>Period</label><select id="pk"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="month">This month</option><option value="last">Last month</option></select></div><div id="rp" class="muted">Loading…</div>';
   $('#pk').value=pk;$('#pk').onchange=function(){S.period=this.value;viewReport()};
   var r0=periodRange(pk);
   Promise.all([loadChecks(r0[0],r0[1]),call('issues')]).then(function(rs){
@@ -411,9 +411,110 @@ function bars(items,cls){var m=Math.max.apply(null,items.map(function(i){return 
 function covLine(label,n,total){var pc=total?Math.round(n/total*100):0;return '<div><div class="row" style="justify-content:space-between"><span>'+label+'</span><b>'+n+' of '+total+'</b></div><div style="background:var(--line);border-radius:99px;height:10px;overflow:hidden"><div style="height:100%;width:'+pc+'%;background:var(--'+(pc===100?'grn':'navy')+')"></div></div></div>'}
 function goBtns(root){[].forEach.call(root.querySelectorAll('[data-tab-go]'),function(b){b.onclick=function(){S.tab=b.dataset.tabGo;main()}});[].forEach.call(root.querySelectorAll('[data-issue]'),function(b){b.onclick=function(){openIssue(b.dataset.issue)}})}
 function issueLine(i){return '<button class="post" data-issue="'+esc(i.id)+'" style="padding:10px"><span><b>'+esc(i.id)+' · '+esc(i.post)+'</b><small>'+esc(i.category)+' · '+ageTxt(i.created)+' ago'+(i.lastRemark?' · '+esc(i.lastRemark.slice(0,50)):'')+'</small></span>'+statusChip(i.status)+'</button>'}
+/* ---------- Head Office analytics dashboard ---------- */
+var DASH_CSS='<style>'+
+'.wide{max-width:1120px!important}'+
+'.dg{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px}.dg .w2{grid-column:1/-1}'+
+'.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}'+
+'.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.05)}'+
+'.kpi .l{font-size:13px;color:var(--mute);font-weight:600}.kpi .v{font-size:32px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--fg)}.kpi .s{font-size:12.5px;color:var(--mute)}'+
+'.dh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}'+
+'.dh .seg{width:auto}.dh .seg button{padding:8px 14px;font-size:14px}'+
+'.ct{font-weight:800;font-size:16px;color:var(--navy)}.cs{font-size:12.5px;color:var(--mute);margin-top:-6px}'+
+'.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--mute)}.lg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}'+
+'.hb{display:grid;grid-template-columns:minmax(90px,150px) 1fr auto;gap:4px 10px;align-items:center;font-size:14px}.hb .t{height:12px;background:var(--line);border-radius:4px;overflow:hidden;opacity:1}.hb .t b{display:block;height:100%;border-radius:0 4px 4px 0}.hb .n{font-weight:700;font-variant-numeric:tabular-nums}'+
+'.sb{display:flex;gap:2px;height:22px}.sb b{display:block;border-radius:4px;min-width:3px}'+
+'.dch{--c1:#2a78d6;--c2:#eb6834;--c3:#1baf7a;--c4:#eda100;--ok:#166534;--warn:#B45309;--bad:#B91C1C}'+
+'@media (prefers-color-scheme:dark){.dch{--c1:#3987e5;--c2:#d95926;--c3:#199e70;--c4:#c98500;--ok:#86EFAC;--warn:#FCD34D;--bad:#FCA5A5}}'+
+'.dch svg{display:block;max-width:100%}.dch svg text{fill:var(--mute);font:11px Public Sans,system-ui,sans-serif}'+
+'.scr{overflow-x:auto}'+
+'</style>';
+function dRange(p){var e=ymd(0),st=p==='7'?ymd(-6):p==='30'?ymd(-29):e.slice(0,8)+'01';return [st,e]}
+function dDays(a,b){var o=[],d=new Date(a+'T00:00:00Z'),e=new Date(b+'T00:00:00Z');while(d<=e){o.push(d.toISOString().slice(0,10));d=new Date(d.getTime()+864e5)}return o}
+function dShort(d){var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return +d.slice(8)+' '+m[+d.slice(5,7)-1]}
+function kpi(l,v,s,col){return '<div class="kpi"><div class="l">'+l+'</div><div class="v"'+(col?' style="color:'+col+'"':'')+'>'+v+'</div><div class="s">'+(s||'&nbsp;')+'</div></div>'}
+function hbars(items,color,max){
+  if(!items.length)return '<div class="muted">No data in this period.</div>';
+  max=max||Math.max.apply(null,items.map(function(i){return i.v}))||1;
+  return '<div class="hb">'+items.map(function(i){return '<div title="'+esc(i.l)+'" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(i.l)+'</div><div class="t"><b style="width:'+Math.max(2,i.v/max*100)+'%;background:'+color+'"></b></div><div class="n">'+i.v+(i.x?' <span class="muted" style="font-weight:500">'+esc(i.x)+'</span>':'')+'</div>'}).join('')+'</div>'}
+function segBar(parts){
+  var tot=parts.reduce(function(a,p){return a+p.v},0);
+  if(!tot)return '<div class="muted">No data in this period.</div>';
+  return '<div class="sb" role="img" aria-label="'+parts.map(function(p){return p.l+' '+p.v}).join(', ')+'">'+parts.filter(function(p){return p.v}).map(function(p){return '<b title="'+esc(p.l)+': '+p.v+'" style="flex:'+p.v+';background:'+p.c+'"></b>'}).join('')+'</div>'+
+   '<div class="lg">'+parts.map(function(p){return '<span><i style="background:'+p.c+'"></i>'+esc(p.l)+' <b style="color:var(--fg)">'+p.v+'</b>'+(tot?' ('+Math.round(p.v/tot*100)+'%)':'')+'</span>'}).join('')+'</div>'}
+function dailyChart(days,a,b){
+  var W=660,H=230,L=32,R=6,T=10,B=26,pw=W-L-R,ph=H-T-B,n=days.length,mx=Math.max.apply(null,a.concat(b).concat([1]));
+  var step=mx<=5?1:mx<=10?2:mx<=25?5:10,top=Math.ceil(mx/step)*step,g=pw/n,bw=Math.max(3,Math.min(16,(g-5)/2)),s='';
+  for(var t=0;t<=top;t+=step){var y=T+ph-t/top*ph;s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y+'" y2="'+y+'" stroke="var(--line)" stroke-width="1"/><text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end">'+t+'</text>'}
+  var every=n>20?5:n>10?2:1;
+  days.forEach(function(d,i){
+    var cx=L+g*i+g/2,x1=cx-bw-1,x2=cx+1;
+    [[a[i],x1,'var(--c1)','raised'],[b[i],x2,'var(--c2)','resolved']].forEach(function(z){
+      var h=z[0]/top*ph;if(h>0)s+='<path d="M'+z[1]+' '+(T+ph)+'V'+(T+ph-h+3)+'Q'+z[1]+' '+(T+ph-h)+' '+(z[1]+3)+' '+(T+ph-h)+'H'+(z[1]+bw-3)+'Q'+(z[1]+bw)+' '+(T+ph-h)+' '+(z[1]+bw)+' '+(T+ph-h+3)+'V'+(T+ph)+'Z" fill="'+z[2]+'"><title>'+dShort(d)+' · '+z[0]+' '+z[3]+'</title></path>'});
+    s+='<rect x="'+(L+g*i)+'" y="'+T+'" width="'+g+'" height="'+ph+'" fill="transparent"><title>'+dShort(d)+': '+a[i]+' raised, '+b[i]+' resolved</title></rect>';
+    if(i%every===0||i===n-1)s+='<text x="'+cx+'" y="'+(H-8)+'" text-anchor="middle">'+(n>10?+d.slice(8):dShort(d))+'</text>'});
+  return '<div class="scr"><svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Issues raised and resolved per day">'+s+'</svg></div>'}
+function heatmap(days,posts,map){
+  var LW=122,cw=days.length<=10?46:days.length<=16?30:17,rh=11,gap=2,pad=5,rowH=rh*2+gap+pad,W=LW+days.length*cw+4,H=26+posts.length*rowH,s='';
+  days.forEach(function(d,i){var e=days.length>20?5:days.length>10?2:1;if(i%e===0)s+='<text x="'+(LW+i*cw+cw/2)+'" y="14" text-anchor="middle">'+(days.length>10?+d.slice(8):dShort(d))+'</text>'});
+  posts.forEach(function(p,r){
+    var y=24+r*rowH;s+='<text x="'+(LW-8)+'" y="'+(y+rh+3)+'" text-anchor="end">'+esc(p.length>20?p.slice(0,19)+'…':p)+'</text>';
+    days.forEach(function(d,i){['Day','Night'].forEach(function(sh,k){
+      var st=map[p+'|'+d+'|'+sh],f=st==='ok'?'var(--c1)':st==='late'?'var(--c4)':st==='abs'?'var(--bad)':'var(--line)',txt=st==='ok'?'checked, present':st==='late'?'checked, late':st==='abs'?'absent':'not checked';
+      s+='<rect x="'+(LW+i*cw+1)+'" y="'+(y+k*(rh+gap))+'" width="'+(cw-2)+'" height="'+rh+'" rx="2.5" fill="'+f+'"'+(st?'':' opacity=".55"')+'><title>'+esc(p)+' · '+dShort(d)+' · '+sh+': '+txt+'</title></rect>'})})});
+  return '<div class="scr"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:'+Math.min(W,560)+'px" role="img" aria-label="Rounds completed by gate and day">'+s+'</svg></div>'+
+   '<div class="lg"><span><i style="background:var(--c1)"></i>Checked</span><span><i style="background:var(--c4)"></i>Late guard</span><span><i style="background:var(--bad)"></i>Absent found</span><span><i style="background:var(--line)"></i>Not checked</span><span class="muted">Top row Day, bottom row Night</span></div>'}
+function viewHeadDash(){
+  var m=$('#mn');m.classList.add('wide');var p=S.dp||'30',rg=dRange(p);
+  m.innerHTML=DASH_CSS+'<div class="dh"><h2>Head Office dashboard</h2><div class="seg" id="dps"><button data-p="7"'+(p==='7'?' aria-pressed="true"':'')+'>7 days</button><button data-p="30"'+(p==='30'?' aria-pressed="true"':'')+'>30 days</button><button data-p="month"'+(p==='month'?' aria-pressed="true"':'')+'>This month</button></div></div><div id="hm" class="muted">Loading…</div>';
+  [].forEach.call(document.querySelectorAll('#dps button'),function(b){b.onclick=function(){S.dp=b.dataset.p;viewHeadDash()}});
+  Promise.all([call('issues',{days:62}),call('checks',{from:rg[0],to:rg[1]})]).then(function(rs){
+    if(!rs[0].ok||!rs[1].ok){$('#hm').innerHTML='<span class="err">'+esc(rs[0].ok?rs[1].error:rs[0].error)+'</span>';return}
+    var all=rs[0].issues,cs=rs[1].checks,days=dDays(rg[0],rg[1]),inP=function(d){return d>=rg[0]&&d<=rg[1]};
+    S.issues=all;
+    var raised=all.filter(function(i){return inP(i.created.slice(0,10))}),solved=all.filter(function(i){return i.status==='Solved'&&i.solvedAt&&inP(i.solvedAt.slice(0,10))});
+    var open=all.filter(function(i){return i.status!=='Solved'}),od=open.filter(isOverdue);
+    var hrs=solved.map(function(i){return (parseT(i.solvedAt)-parseT(i.created))/36e5}),avg=hrs.length?hrs.reduce(function(a,b){return a+b},0)/hrs.length:null;
+    var rate=raised.length?Math.round(raised.filter(function(i){return i.status==='Solved'}).length/raised.length*100):null;
+    var perDayR=days.map(function(d){return raised.filter(function(i){return i.created.slice(0,10)===d}).length}),perDayS=days.map(function(d){return solved.filter(function(i){return i.solvedAt.slice(0,10)===d}).length});
+    var cat={},gate={};raised.forEach(function(i){cat[i.category]=(cat[i.category]||0)+1;var g=gate[i.post]=gate[i.post]||{n:0,o:0};g.n++;if(i.status!=='Solved')g.o++});
+    var catI=Object.keys(cat).map(function(k){return {l:k,v:cat[k]}}).sort(function(a,b){return b.v-a.v}).slice(0,8);
+    var gateI=Object.keys(gate).map(function(k){return {l:k,v:gate[k].n,x:gate[k].o?gate[k].o+' open':''}}).sort(function(a,b){return b.v-a.v}).slice(0,8);
+    var cam=raised.filter(function(i){return i.category===CAMCAT});
+    var pres=cs.filter(function(c){return c.presence!=='Absent'&&c.presence!=='Late'}).length,late=cs.filter(function(c){return c.presence==='Late'}).length,abs=cs.filter(function(c){return c.presence==='Absent'}).length;
+    var dbl=cs.filter(function(c){return /DOUBLE/.test(c.flags)}),newg=cs.filter(function(c){return /NEW GUARD/.test(c.flags)}).length;
+    var ty={Regular:0,Temporary:0,Permanent:0,Rotation:0};cs.forEach(function(c){if(c.presence!=='Absent')ty[c.type]=(ty[c.type]||0)+1});
+    var absG={};cs.filter(function(c){return c.presence==='Absent'}).forEach(function(c){absG[c.post]=(absG[c.post]||0)+1});
+    var absI=Object.keys(absG).map(function(k){return {l:k,v:absG[k]}}).sort(function(a,b){return b.v-a.v}).slice(0,8);
+    var map={};cs.forEach(function(c){var k=c.post+'|'+c.date+'|'+c.shift,st=c.presence==='Absent'?'abs':c.presence==='Late'?'late':'ok',o=map[k];if(!o||(o==='abs'&&st!=='abs')||(o==='ok'&&st==='late'))map[k]=st});
+    var slots=S.posts.length*2*days.length,done=Object.keys(map).length,agency={Sainik:0,Avenger:0};
+    all.forEach(function(i){var f=(i.log||[]).some(function(l){return /Forwarded to Sainik/.test(l.remark||'')}),g=(i.log||[]).some(function(l){return /Forwarded to Avenger/.test(l.remark||'')});if(inP(i.created.slice(0,10))){if(f)agency.Sainik++;if(g)agency.Avenger++}});
+    var tbl='<details><summary class="muted" style="cursor:pointer">View as table</summary><div class="scr"><table><tr><th>Day</th><th>Raised</th><th>Resolved</th></tr>'+days.map(function(d,i){return '<tr><td>'+dShort(d)+'</td><td>'+perDayR[i]+'</td><td>'+perDayS[i]+'</td></tr>'}).join('')+'</table></div></details>';
+    var html='<div class="dch"><div class="kpis">'+
+      kpi('Issues raised',raised.length,rate==null?'':rate+'% resolved')+
+      kpi('Resolved',solved.length,avg==null?'':'avg '+(avg<48?Math.round(avg*10)/10+' h':Math.round(avg/24*10)/10+' days')+' to solve')+
+      kpi('Open now',open.length,od.length?od.length+' overdue (24 h+)':'none overdue',od.length?'var(--red)':'')+
+      kpi('Rounds done',done,slots?Math.round(done/slots*100)+'% of gate-shifts':'')+
+      kpi('Absent found',abs,late?late+' late':'',abs?'var(--red)':'')+
+      kpi('Double duty',dbl.length,newg+' new guards',dbl.length?'var(--red)':'')+
+      kpi('Camera reports',cam.length,'by Control Room')+
+      kpi('Guards seen',Object.keys(cs.reduce(function(o,c){if(c.guardId)o[c.guardId]=1;return o},{})).length,'different guards in rounds')+
+    '</div><div class="dg" style="margin-top:12px">'+
+      '<div class="card w2"><div class="ct">Issues raised vs resolved, per day</div><div class="lg"><span><i style="background:var(--c1)"></i>Raised</span><span><i style="background:var(--c2)"></i>Resolved</span></div>'+dailyChart(days,perDayR,perDayS)+tbl+'</div>'+
+      '<div class="card"><div class="ct">Issues by category</div><div class="cs">Raised in this period</div>'+hbars(catI,'var(--c1)')+'</div>'+
+      '<div class="card"><div class="ct">Issues by gate</div><div class="cs">Raised in this period, with how many are still open</div>'+hbars(gateI,'var(--c1)')+'</div>'+
+      '<div class="card w2"><div class="ct">Round scan map</div><div class="cs">Which gates were checked, each day and shift</div>'+heatmap(days,S.posts,map)+'</div>'+
+      '<div class="card"><div class="ct">Attendance at checks</div><div class="cs">All guards seen in rounds</div>'+segBar([{l:'Present',v:pres,c:'var(--ok)'},{l:'Late',v:late,c:'var(--c4)'},{l:'Absent',v:abs,c:'var(--bad)'}])+'<div class="cs" style="margin-top:6px">Guard type</div>'+segBar([{l:'Regular',v:ty.Regular||0,c:'var(--c1)'},{l:'Temporary',v:ty.Temporary||0,c:'var(--c2)'},{l:'Permanent',v:ty.Permanent||0,c:'var(--c3)'},{l:'Rotation',v:ty.Rotation||0,c:'var(--c4)'}])+'</div>'+
+      '<div class="card"><div class="ct">Absences by gate</div><div class="cs">Guards found absent in rounds</div>'+hbars(absI,'var(--bad)')+'<div class="ct" style="margin-top:6px">Sent to agency</div><div class="cs">Issues forwarded by the Control Room</div>'+hbars([{l:'Sainik Security',v:agency.Sainik},{l:'Avenger Security',v:agency.Avenger}],'var(--c1)',Math.max(1,agency.Sainik,agency.Avenger))+'</div>'+
+      '<div class="card"><div class="ct">Unsolved for more than 24 hours</div>'+(od.length?od.sort(function(a,b){return parseT(a.created)-parseT(b.created)}).slice(0,6).map(issueLine).join(''):'<div class="flag ok">Nothing overdue.</div>')+'<button class="btn o s" data-tab-go="issues">All issues</button></div>'+
+      '<div class="card"><div class="ct">Latest camera reports</div>'+(cam.length?cam.slice(-5).reverse().map(issueLine).join(''):'<div class="muted">None in this period.</div>')+'</div>'+
+      rosterCard().replace('<div class="card"','<div class="card w2"')+
+    '</div><div class="row" style="margin-top:12px"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">See today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button></div></div>';
+    $('#hm').outerHTML='<div id="hm">'+html+'</div>';var root=$('#hm');goBtns(root);fillGateInstr();
+  })}
 function viewHome(){
-  var m=$('#mn');
-  m.innerHTML='<h2>'+({supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role])+' dashboard <span class="gu">ડેશબોર્ડ</span></h2><div id="hm" class="muted">Loading…</div>';
+  var m=$('#mn');m.classList.remove('wide');if(S.role==='head'){viewHeadDash();return}
+  m.innerHTML='<h2>'+({supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role])+' dashboard</h2><div id="hm" class="muted">Loading…</div>';
   var wk=S.role==='head'?[ymd(-6),ymd(0)]:null;
   var calls=[loadChecks(),call('issues')];if(wk)calls.push(call('checks',{from:wk[0],to:wk[1]}));
   Promise.all(calls).then(function(rs){
@@ -452,7 +553,7 @@ function viewHome(){
   });
 }
 function viewRoster(){
-  $('#mn').innerHTML='<div class="row" style="justify-content:space-between"><h2>Roster <span class="gu">રોસ્ટર</span></h2><a class="btn o s" style="text-decoration:none" href="../" target="_blank" rel="noopener">Open full page</a></div><div class="muted">Pick days and gates, then Download PDF.</div><iframe src="../?v='+Date.now()+'" title="Gate rosters" style="width:100%;height:calc(100vh - 230px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe>';
+  $('#mn').innerHTML='<div class="row" style="justify-content:space-between"><h2>Roster</h2><a class="btn o s" style="text-decoration:none" href="../" target="_blank" rel="noopener">Open full page</a></div><div class="muted">Pick days and gates, then Download PDF.</div><iframe src="../?v='+Date.now()+'" title="Gate rosters" style="width:100%;height:calc(100vh - 230px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe>';
 }
 
 /* ---------- start ---------- */

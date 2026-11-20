@@ -128,7 +128,7 @@ function doPost(e) {
       case 'addGuard': return json_(addGuard_(q, by, role));
       case 'submitCheck': return json_(submitCheck_(q, by, role));
       case 'raiseIssue': return json_(raiseIssue_(q, by, role));
-      case 'issues': return json_(listIssues_(role));
+      case 'issues': return json_(listIssues_(role, q));
       case 'updateIssue': return json_(updateIssue_(q, by, role));
       case 'checks': return json_(listChecks_(q.from || q.date || today_(), q.to || q.from || q.date || today_()));
       default: return json_({ ok: false, error: 'Unknown action' });
@@ -225,8 +225,9 @@ function raiseIssue_(q, by, role) {
 
 /** Camera sightings are for Control Room and Head Office only. */
 var PRIVATE_CAT = 'Suspicious activity (seen on camera)';
-function listIssues_(role) {
-  var logs = rows_('Log'), byId = {}, cutoff = new Date().getTime() - 7 * 24 * 3600 * 1000;
+function listIssues_(role, q) {
+  var days = Math.min(Math.max(Number(q && q.days) || 7, 1), 62);
+  var logs = rows_('Log'), byId = {}, cutoff = new Date().getTime() - days * 24 * 3600 * 1000;
   logs.forEach(function (l) { (byId[l.IssueID] = byId[l.IssueID] || []).push({ time: l.Time, by: l.By, role: l.Role, action: l.Action, remark: l.Remark, photo: l.PhotoId }); });
   var out = rows_('Issues').filter(function (r) {
     if (role === 'supervisor' && r.Category === PRIVATE_CAT) return false;
@@ -236,7 +237,7 @@ function listIssues_(role) {
       photo: r.PhotoId, raisedBy: r.RaisedBy, status: r.Status, lastRemark: r.LastRemark, updated: r.Updated, solvedAt: r.SolvedAt,
       log: (byId[r.ID] || []).slice(-8) };
   });
-  return { ok: true, issues: out.slice(-300) };
+  return { ok: true, issues: out.slice(days > 7 ? -1500 : -300) };
 }
 
 function updateIssue_(q, by, role) {
