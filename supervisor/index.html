@@ -114,6 +114,35 @@ function compress(file){return new Promise(function(res){
     c.getContext('2d').drawImage(im,0,0,c.width,c.height);var o=c.toDataURL('image/jpeg',0.68);URL.revokeObjectURL(u);res(o)}catch(e){res('')}};
   im.onerror=function(){URL.revokeObjectURL(u);res('')};im.src=u})}
 
+/* ---------- in-page camera: keeps the browser open (no jump to the phone's camera app) ---------- */
+(function(){
+  var busy=false;
+  document.addEventListener('click',function(e){
+    var el=e.target;if(!el||el.tagName!=='INPUT'||el.type!=='file'||!el.hasAttribute('capture'))return;
+    if(el.dataset.native==='1'){el.dataset.native='';return}
+    if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){return}
+    e.preventDefault();if(busy)return;busy=true;
+    var facing=el.getAttribute('capture')==='user'?'user':'environment';
+    var d=document.createElement('div');d.style.cssText='position:fixed;inset:0;z-index:99999;background:#000;display:flex;flex-direction:column';
+    d.innerHTML='<video playsinline muted autoplay style="flex:1;min-height:0;width:100%;object-fit:cover;background:#000"></video><div style="display:flex;gap:12px;justify-content:center;align-items:center;padding:16px;background:#000"><button type="button" id="cmx" style="padding:12px 18px;border-radius:10px;border:1px solid #888;background:#222;color:#fff;font-size:16px">Cancel</button><button type="button" id="cms" aria-label="Take photo" style="width:68px;height:68px;border-radius:50%;border:5px solid #fff;background:#e53935"></button><button type="button" id="cmn" style="padding:12px 18px;border-radius:10px;border:1px solid #888;background:#222;color:#fff;font-size:16px">Phone camera</button></div>';
+    document.body.appendChild(d);
+    var v=d.querySelector('video'),st=null;
+    function close(){try{st&&st.getTracks().forEach(function(t){t.stop()})}catch(x){}d.remove();busy=false}
+    function native(){close();el.dataset.native='1';el.click()}
+    d.querySelector('#cmx').onclick=close;d.querySelector('#cmn').onclick=native;
+    navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:960}},audio:false}).then(function(s){
+      st=s;v.srcObject=s;v.play&&v.play();
+      d.querySelector('#cms').onclick=function(){
+        if(!v.videoWidth){return}
+        var m=1280,k=Math.min(1,m/Math.max(v.videoWidth,v.videoHeight)),c=document.createElement('canvas');c.width=Math.round(v.videoWidth*k);c.height=Math.round(v.videoHeight*k);
+        c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+        c.toBlob(function(b){if(!b){native();return}
+          try{var f=new File([b],'photo.jpg',{type:'image/jpeg',lastModified:Date.now()}),dt=new DataTransfer();dt.items.add(f);el.files=dt.files;el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('input',{bubbles:true}))}catch(x){close();el.dataset.native='1';el.click();return}
+          close()},'image/jpeg',0.8)}
+    }).catch(function(){native()});
+  },true);
+})();
+
 /* ---------- login ---------- */
 function viewLogin(msg){
   $('#app').innerHTML='<main><div class="hero"><img class="logo-l" src="../assets/logo.png" alt="Siyanat Al Mumtalakat"><img class="logo-d" src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><h1>Security Control</h1><p>Aljamea-tus-Saifiyah</p></div><div class="card"><h2>Sign in</h2>'+
