@@ -19,6 +19,15 @@ var POSTS = ['Gate 1', 'Gate 2', 'Gate 4', 'Gate 6 (Rabvat)', 'Gate 8 & 9', 'MVD
 
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 function now_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss'); }
+/** A night shift (8 PM to 8 AM) belongs to the date it STARTED on, so 2 AM on the 20th is still the night of the 19th. */
+function shiftKey_(date, shift, time) {
+  var h = Number(String(time || '').slice(11, 13));
+  if (shift === 'Night' && h < 8) {
+    var d = new Date(date + 'T12:00:00+05:30'); d.setDate(d.getDate() - 1);
+    date = Utilities.formatDate(d, TZ, 'yyyy-MM-dd');
+  }
+  return date + '|' + shift;
+}
 function today_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'); }
 
 /** Run ONCE from the editor. Creates sheets, default settings and the photo folder. */
@@ -188,7 +197,7 @@ function submitCheck_(q, by, role) {
       if (c.GuardId !== guard.ID || c.Presence === 'Absent') continue;
       seen = true;
       var t = new Date(c.Time.replace(' ', 'T') + '+05:30').getTime();
-      if (t >= cutoff && (c.Date !== date || c.Shift !== shift)) flags.push('DOUBLE DUTY: ' + guard.Name + ' was also at ' + c.Post + ' (' + c.Shift + ', ' + c.Date + ')');
+      if (t >= cutoff && shiftKey_(c.Date, c.Shift, c.Time) !== shiftKey_(date, shift, now_())) flags.push('DOUBLE DUTY: ' + guard.Name + ' was also at ' + c.Post + ' (' + c.Shift + ', ' + c.Date + ')');
     }
     if (!seen) flags.push('NEW GUARD: first time on record. Ask Sainik for his ID proof.');
   }

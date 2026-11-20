@@ -97,6 +97,7 @@ function parseT(s){return new Date(String(s).replace(' ','T')+'+05:30')}
 function ageH(s){return (Date.now()-parseT(s).getTime())/36e5}
 function ageTxt(s){var h=ageH(s);if(h<1)return Math.max(1,Math.round(h*60))+' min';if(h<48)return Math.round(h)+' h';return Math.round(h/24)+' days'}
 function ymd(offset){var d=new Date(Date.now()+5.5*36e5+offset*864e5);return d.toISOString().slice(0,10)}
+function shiftKey(d,sh,t){var h=+String(t||'').slice(11,13);if(sh==='Night'&&h<8){var x=new Date(d+'T12:00:00');x.setDate(x.getDate()-1);d=x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2)+'-'+('0'+x.getDate()).slice(-2)}return d+'|'+sh}
 function defShift(){var h=new Date().getHours();return (h>=8&&h<20)?'Day':'Night'}
 function thumb(id,sz){return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w'+(sz||600)}
 function gInfo(id){return (S.guards||[]).filter(function(g){return g.id===id})[0]||{}}
@@ -177,7 +178,7 @@ function openCheck(post){
     r.checks.forEach(function(c){
       if(c.presence==='Absent'||!c.guardId)return;
       if(parseT(c.time).getTime()<cut)return;
-      if(c.date===today&&c.shift===S.shift)return;
+      if(shiftKey(c.date,c.shift,c.time)===shiftKey(today,S.shift,ymd(0)+' '+('0'+new Date().getHours()).slice(-2)))return;
       dutyMap[c.guardId]=c;
     });
     [].forEach.call($('#gd',d).options,function(o){if(dutyMap[o.value]&&o.textContent.charAt(0)!=='⚠')o.textContent='⚠ '+o.textContent});
