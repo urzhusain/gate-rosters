@@ -19,14 +19,37 @@ var POSTS = ['Gate 1', 'Gate 2', 'Gate 4', 'Gate 6 (Rabvat)', 'Gate 8 & 9', 'MVD
 
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 function now_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss'); }
-/** A night shift (8 PM to 8 AM) belongs to the date it STARTED on, so 2 AM on the 20th is still the night of the 19th. */
-function shiftKey_(date, shift, time) {
-  var h = Number(String(time || '').slice(11, 13));
-  if (shift === 'Night' && h < 8) {
-    var d = new Date(date + 'T12:00:00+05:30'); d.setDate(d.getDate() - 1);
-    date = Utilities.formatDate(d, TZ, 'yyyy-MM-dd');
+/** Double duty is judged by the CLOCK, not the label: Day = 9:00-19:30, Night = 20:30-7:30. Handover times (7:30-9:00, 19:30-20:30) count as neither. */
+function dutyClass_(time) {
+  var m = String(time || '').match(/(\d+):(\d+)/); if (!m) return '';
+  var mins = Number(m[1]) * 60 + Number(m[2]);
+  if (mins >= 540 && mins < 1170) return 'Day';
+  if (mins >= 1230 || mins < 450) return 'Night';
+  return '';
+}
+function ts_(t) { return new Date(String(t).replace(' ', 'T').replace(/T(\d):/, 'T0$1:') + '+05:30').getTime(); }
+/** Run once from the editor to recompute DOUBLE DUTY flags on old rows. */
+function repairFlags() {
+  var sh = ss_().getSheetByName('Checks'), v = sh.getDataRange().getValues(), h = v[0], iT = h.indexOf('Time'), iG = h.indexOf('GuardId'), iP = h.indexOf('Presence'), iF = h.indexOf('Flags'), iPost = h.indexOf('Post'), iS = h.indexOf('Shift'), iD = h.indexOf('Date');
+  var n = 0;
+  for (var r = 1; r < v.length; r++) {
+    var parts = String(v[r][iF] || '').split(' | ').filter(function (x) { return x && x.indexOf('DOUBLE DUTY') !== 0; });
+    var cls = dutyClass_(v[r][iT]);
+    if (v[r][iG] && v[r][iP] !== 'Absent' && cls) {
+      var t = ts_(v[r][iT]), seen = {};
+      for (var k = 0; k < r; k++) {
+        if (v[k][iG] !== v[r][iG] || v[k][iP] === 'Absent') continue;
+        var tk = ts_(v[k][iT]), c2 = dutyClass_(v[k][iT]);
+        if (c2 && c2 !== cls && t - tk <= 24 * 3600 * 1000 && !seen[v[k][iPost] + c2]) {
+          seen[v[k][iPost] + c2] = 1;
+          parts.push('DOUBLE DUTY: ' + v[r][iG + 1] + ' was also at ' + v[k][iPost] + ' (' + c2 + ', ' + String(v[k][iT]).slice(0, 10) + ')');
+        }
+      }
+    }
+    var nf = parts.join(' | ');
+    if (nf !== String(v[r][iF] || '')) { sh.getRange(r + 1, iF + 1).setValue(nf); n++; }
   }
-  return date + '|' + shift;
+  return n;
 }
 function today_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'); }
 
@@ -191,13 +214,14 @@ function submitCheck_(q, by, role) {
     return { ok: false, error: 'Choose the guard, or mark the post Absent' };
   }
   if (guard && presence !== 'Absent') {
-    var all = rows_('Checks'), cutoff = new Date().getTime() - 24 * 3600 * 1000, seen = false;
+    var all = rows_('Checks'), cutoff = new Date().getTime() - 24 * 3600 * 1000, seen = false, myClass = dutyClass_(now_());
     for (var k = 0; k < all.length; k++) {
       var c = all[k];
       if (c.GuardId !== guard.ID || c.Presence === 'Absent') continue;
       seen = true;
-      var t = new Date(c.Time.replace(' ', 'T') + '+05:30').getTime();
-      if (t >= cutoff && shiftKey_(c.Date, c.Shift, c.Time) !== shiftKey_(date, shift, now_())) flags.push('DOUBLE DUTY: ' + guard.Name + ' was also at ' + c.Post + ' (' + c.Shift + ', ' + c.Date + ')');
+      var t = ts_(c.Time);
+      var cc = dutyClass_(c.Time);
+      if (t >= cutoff && myClass && cc && cc !== myClass) flags.push('DOUBLE DUTY: ' + guard.Name + ' was also at ' + c.Post + ' (' + cc + ', ' + c.Date + ')');
     }
     if (!seen) flags.push('NEW GUARD: first time on record. Ask Sainik for his ID proof.');
   }
