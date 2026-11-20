@@ -448,7 +448,7 @@ function addAlert_(type, key, level, msg, aud) {
   var last = sh.getLastRow(), from = Math.max(2, last - 400);
   if (last >= 2 && sh.getRange(from, 3, last - from + 1, 1).getValues().some(function (r) { return String(r[0]) === key; })) return false;
   add_('Alerts', { Time: now_(), Type: type, Key: key, Level: level, Message: msg, Audience: aud });
-  if (level === 'high') emailAlert_(msg);
+  if (level === 'high' && type === 'issue' && /^(unack|overdue):/.test(key)) emailAlert_(msg); // email only unsolved issues, not rounds or scans
   return true;
 }
 /** Emails important alerts to the address(es) in Settings > alert_email. Never lets an email problem break the app. */
