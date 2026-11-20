@@ -27,10 +27,22 @@ function dutyClass_(time) {
   if (mins >= 1230 || mins < 450) return 'Night';
   return '';
 }
+function nearHandover_(time) {
+  var m = String(time || '').match(/(\d+):(\d+)/); if (!m) return false;
+  var x = Number(m[1]) * 60 + Number(m[2]);
+  return (x >= 360 && x < 600) || (x >= 1080 && x < 1320);
+}
+/** Same guard, opposite windows, within 24h. If the two scans were done by DIFFERENT accounts (Supervisor in the evening, Control Room in the morning) and one is near a handover, they bookend ONE shift, so it is not double duty. */
+function isDouble_(timeA, byA, timeB, byB) {
+  var a = dutyClass_(timeA), b = dutyClass_(timeB);
+  if (!a || !b || a === b) return false;
+  if (byA !== byB && (nearHandover_(timeA) || nearHandover_(timeB))) return false;
+  return true;
+}
 function ts_(t) { return new Date(String(t).replace(' ', 'T').replace(/T(\d):/, 'T0$1:') + '+05:30').getTime(); }
 /** Run once from the editor to recompute DOUBLE DUTY flags on old rows. */
 function repairFlags() {
-  var sh = ss_().getSheetByName('Checks'), v = sh.getDataRange().getValues(), h = v[0], iT = h.indexOf('Time'), iG = h.indexOf('GuardId'), iP = h.indexOf('Presence'), iF = h.indexOf('Flags'), iPost = h.indexOf('Post'), iS = h.indexOf('Shift'), iD = h.indexOf('Date');
+  var sh = ss_().getSheetByName('Checks'), v = sh.getDataRange().getValues(), h = v[0], iT = h.indexOf('Time'), iG = h.indexOf('GuardId'), iP = h.indexOf('Presence'), iF = h.indexOf('Flags'), iPost = h.indexOf('Post'), iS = h.indexOf('Shift'), iD = h.indexOf('Date'), iBy = h.indexOf('By');
   var n = 0;
   for (var r = 1; r < v.length; r++) {
     var parts = String(v[r][iF] || '').split(' | ').filter(function (x) { return x && x.indexOf('DOUBLE DUTY') !== 0; });
@@ -40,7 +52,7 @@ function repairFlags() {
       for (var k = 0; k < r; k++) {
         if (v[k][iG] !== v[r][iG] || v[k][iP] === 'Absent') continue;
         var tk = ts_(v[k][iT]), c2 = dutyClass_(v[k][iT]);
-        if (c2 && c2 !== cls && t - tk <= 24 * 3600 * 1000 && !seen[v[k][iPost] + c2]) {
+        if (isDouble_(v[k][iT], v[k][iBy], v[r][iT], v[r][iBy]) && t - tk <= 24 * 3600 * 1000 && !seen[v[k][iPost] + c2]) {
           seen[v[k][iPost] + c2] = 1;
           parts.push('DOUBLE DUTY: ' + v[r][iG + 1] + ' was also at ' + v[k][iPost] + ' (' + c2 + ', ' + String(v[k][iT]).slice(0, 10) + ')');
         }
@@ -221,7 +233,7 @@ function submitCheck_(q, by, role) {
       seen = true;
       var t = ts_(c.Time);
       var cc = dutyClass_(c.Time);
-      if (t >= cutoff && myClass && cc && cc !== myClass) flags.push('DOUBLE DUTY: ' + guard.Name + ' was also at ' + c.Post + ' (' + cc + ', ' + c.Date + ')');
+      if (t >= cutoff && isDouble_(c.Time, c.By, now_(), by)) flags.push('DOUBLE DUTY: ' + guard.Name + ' was also at ' + c.Post + ' (' + cc + ', ' + c.Date + ')');
     }
     if (!seen) flags.push('NEW GUARD: first time on record. Ask Sainik for his ID proof.');
   }
