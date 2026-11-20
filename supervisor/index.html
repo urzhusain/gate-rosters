@@ -97,8 +97,9 @@ function parseT(s){return new Date(String(s).replace(' ','T')+'+05:30')}
 function ageH(s){return (Date.now()-parseT(s).getTime())/36e5}
 function ageTxt(s){var h=ageH(s);if(h<1)return Math.max(1,Math.round(h*60))+' min';if(h<48)return Math.round(h)+' h';return Math.round(h/24)+' days'}
 function ymd(offset){var d=new Date(Date.now()+5.5*36e5+offset*864e5);return d.toISOString().slice(0,10)}
-function dutyCls(t){var m=String(t||'').match(/(\d+):(\d+)/);if(!m)return '';var x=+m[1]*60+ +m[2];return x>=540&&x<1170?'Day':(x>=1230||x<450?'Night':'')}
-function nearH(t){var m=String(t||'').match(/(\d+):(\d+)/);if(!m)return false;var x=+m[1]*60+ +m[2];return (x>=360&&x<600)||(x>=1080&&x<1320)}
+function nowMin(){var t=new Date(Date.now()+5.5*36e5);return t.getUTCHours()*60+t.getUTCMinutes()}
+function outsideShiftC(sh,x){if(sh==='Day')return x>=1260||x<420;if(sh==='Night')return x>=540&&x<1140;return false}
+function hhmm(x){return ('0'+Math.floor(x/60)).slice(-2)+':'+('0'+x%60).slice(-2)}
 function defShift(){var h=new Date().getHours();return (h>=8&&h<20)?'Day':'Night'}
 function thumb(id,sz){return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w'+(sz||600)}
 function gInfo(id){return (S.guards||[]).filter(function(g){return g.id===id})[0]||{}}
@@ -123,7 +124,7 @@ function viewLogin(msg){
     S.pin=p;$('#lg').disabled=true;$('#lg').textContent='Checking…';
     call('bootstrap').then(function(r){
       if(!r.ok){S.pin='';viewLogin(r.error);return}
-      store('pin',p);S.name=r.name;S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;
+      store('pin',p);S.name=r.name;S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;
       S.shift=defShift();S.tab='home';S.filter=r.role==='head'?'overdue':'open';
       main()})};
 }
@@ -163,33 +164,28 @@ function modal(html){var d=document.createElement('div');d.className='modal';d.i
 function openCheck(post){
   var gs=S.guards.slice().sort(function(a,b){return a.name.localeCompare(b.name)});
   var d=modal('<h2>'+esc(post)+' · '+S.shift+'</h2>'+
-  '<div class="f"><label>Guard on post</label><select id="gd"><option value="">— choose —</option>'+gs.map(function(g){return '<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>'}).join('')+'<option value="__new">+ New guard (register)</option></select></div>'+
-  '<div id="ng" hidden class="card"><b>Register new guard</b><div class="f"><label>Full name</label><input id="gn"></div><div class="f"><label>Phone</label><input id="gp" type="tel" inputmode="tel"></div><div class="f"><label>Photo of the guard</label><input id="gf" type="file" accept="image/*" capture="user"></div><button class="btn o s" id="gs">Save guard</button><div id="gst" class="flag info" hidden></div></div>'+
+  '<div class="f"><label>Guard on post</label><select id="gd"><option value="">— choose —</option>'+gs.map(function(g){return '<option value="'+esc(g.id)+'">'+esc(g.name)+(g.shift?' · '+g.shift:'')+'</option>'}).join('')+'<option value="__new">+ New guard (register)</option></select></div>'+
+  '<div id="ng" hidden class="card"><b>Register new guard</b><div class="f"><label>Full name</label><input id="gn"></div><div class="f"><label>Phone</label><input id="gp" type="tel" inputmode="tel"></div><div class="f"><label>Shift</label><select id="gsh"><option value="Day">Day (8 AM to 8 PM)</option><option value="Night">Night (8 PM to 8 AM)</option></select></div><div class="f"><label>Agency</label><select id="gag"><option value="Sainik">Sainik</option><option value="Avenger">Avenger</option></select></div><div class="f"><label>Photo of the guard (take it now with the camera)</label><input id="gf" type="file" accept="image/*" capture="user"></div><button class="btn o s" id="gs">Save guard</button><div id="gst" class="flag info" hidden></div></div>'+
   '<div class="f"><label>Presence</label><select id="pr"><option>Present</option><option>Late</option><option>Absent</option></select></div>'+
   '<div class="f"><label>Type of duty</label><select id="ty"><option value="Regular">Regular guard</option><option value="Temporary">Temporary replacement</option><option value="Permanent">Permanent replacement</option><option value="Rotation">Rotation (moved by agency)</option></select></div>'+
   '<div class="f" id="rl" hidden><label id="rll"></label><input id="rv"></div>'+
-  '<div class="f"><label>Photo at post (optional)</label><input id="ph" type="file" accept="image/*" capture="environment"></div>'+
+  '<div class="f"><label id="phl">'+(S.role==='supervisor'?'Photo at the post (required, take it now with the camera)':'Camera screenshot (optional)')+'</label><input id="ph" type="file" accept="image/*" capture="environment"></div><div id="lc" class="muted"></div>'+
   '<div class="f"><label>Remark (optional)</label><textarea id="rm"></textarea></div><div class="err" id="ce"></div>'+
   '<button class="btn" id="sv">Save check</button><button class="btn o" id="cn">Cancel</button>');
   $('#cn',d).onclick=function(){d.remove()};
-  var dutyMap={};
-  call('checks',{from:ymd(-1),to:ymd(0)}).then(function(r){
-    if(!r.ok||!d.isConnected)return;
-    var cut=Date.now()-24*36e5,today=ymd(0);
-    r.checks.forEach(function(c){
-      if(c.presence==='Absent'||!c.guardId)return;
-      if(parseT(c.time).getTime()<cut)return;
-      var nt=new Date(Date.now()+5.5*36e5).toISOString().slice(11,16),mc=dutyCls(nt),cc=dutyCls(c.time.slice(11));if(!mc||!cc||mc===cc||(c.by!==S.name&&(nearH(nt)||nearH(c.time.slice(11)))))return;
-      dutyMap[c.guardId]=c;
-    });
-    [].forEach.call($('#gd',d).options,function(o){if(dutyMap[o.value]&&o.textContent.charAt(0)!=='⚠')o.textContent='⚠ '+o.textContent});
-    $('#gd',d).onchange();
-  });
+  var loc=null,locSt='';
+  if(S.role==='supervisor'){
+    if(!navigator.geolocation){locSt='fail';$('#lc',d).innerHTML='<span class="err">📍 This phone cannot share location. The scan will be flagged.</span>'}
+    else{locSt='wait';$('#lc',d).textContent='📍 Getting your location…';
+      navigator.geolocation.getCurrentPosition(function(p){loc={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};locSt='ok';$('#lc',d).textContent='📍 Location ready (accurate to about '+Math.round(p.coords.accuracy)+' m)'},
+        function(){locSt='fail';$('#lc',d).innerHTML='<span class="err">📍 Location is off. Allow location for this site, or the scan will be flagged.</span>'},{enableHighAccuracy:true,timeout:20000,maximumAge:0})}
+  }
+  $('#pr',d).onchange=function(){if(S.role==='supervisor')$('#phl',d).textContent=this.value==='Absent'?'Photo of the empty post (optional)':'Photo at the post (required, take it now with the camera)'};
   $('#gd',d).onchange=function(){
     $('#ng',d).hidden=this.value!=='__new';
-    var w=$('#dw',d),c=dutyMap[this.value];
+    var w=$('#dw',d),g=gInfo(this.value);
     if(!w){w=document.createElement('div');w.id='dw';this.parentNode.appendChild(w)}
-    w.innerHTML=c?'<div class="flag" style="margin-top:8px">⚠ Possible double duty: this guard was also at <b>'+esc(c.post)+'</b> ('+esc(c.shift)+', '+esc(c.date)+'). Ask him, and tell the Control Room.</div>':'';
+    w.innerHTML=(g.id&&g.shift&&outsideShiftC(g.shift,nowMin()))?'<div class="flag" style="margin-top:8px">⚠ Possible double duty: '+esc(g.name)+' is registered for the <b>'+esc(g.shift)+'</b> shift, but it is '+hhmm(nowMin())+' now. Ask him, and tell the Control Room.</div>':(g.id&&!g.shift?'<div class="flag info" style="margin-top:8px">This guard has no shift set yet. Ask the Control Room to set it.</div>':'');
   };
   $('#ty',d).onchange=function(){var t=this.value,r=$('#rl',d);r.hidden=t==='Regular';$('#rll',d).textContent=t==='Rotation'?'Moved from which post?':'Replacing whom? (name)'};
   $('#gs',d).onclick=function(){
@@ -198,7 +194,10 @@ function openCheck(post){
     st.className='flag info';st.hidden=false;
     if(nm.length<3){st.className='flag';st.textContent='Write the guard\'s full name first.';return}
     b.disabled=true;b.textContent='Saving…';st.textContent='Saving the guard, please wait a few seconds…';
-    compress($('#gf',d).files[0]).then(function(img){return call('addGuard',{name:nm,phone:$('#gp',d).value,photo:img})}).then(function(r){
+    var gf=$('#gf',d).files[0];
+    if(S.role==='supervisor'&&!gf){b.disabled=false;b.textContent='Save guard';st.className='flag';st.textContent='Take a photo of the guard with the camera first.';return}
+    if(gf&&gf.lastModified&&Date.now()-gf.lastModified>10*60000){b.disabled=false;b.textContent='Save guard';st.className='flag';st.textContent='That photo is old. Take a new photo of the guard now.';return}
+    compress(gf).then(function(img){return call('addGuard',{name:nm,phone:$('#gp',d).value,shift:$('#gsh',d).value,agency:$('#gag',d).value,post:post,photo:img})}).then(function(r){
       b.disabled=false;b.textContent='Save guard';
       if(!r.ok){st.className='flag';st.textContent=r.error||'Could not save. Try again.';return}
       S.guards.push(r.guard);var s=$('#gd',d);var o=document.createElement('option');o.value=r.guard.id;o.textContent=r.guard.name;s.insertBefore(o,s.lastElementChild);s.value=r.guard.id;s.onchange();
@@ -207,14 +206,20 @@ function openCheck(post){
       var w=$('#dw',d);if(w)w.innerHTML='<div class="flag ok" style="margin-top:8px">✓ '+esc(r.guard.name)+' registered and selected. Now choose Presence and save the check.</div>';
     }).catch(function(){b.disabled=false;b.textContent='Save guard';st.className='flag';st.textContent='No connection. Check the internet and try again.'})};
   $('#sv',d).onclick=function(){
-    var b=this,gid=$('#gd',d).value;
-    if(gid==='__new'){$('#ce',d).textContent='Save the new guard first.';return}
+    var b=this,gid=$('#gd',d).value,pres=$('#pr',d).value,pf=$('#ph',d).files[0],e=$('#ce',d);
+    e.textContent='';
+    if(gid==='__new'){e.textContent='Save the new guard first.';return}
+    if(S.role==='supervisor'&&pres!=='Absent'){
+      if(!pf){e.textContent='Take a photo at the post with the camera. It is required.';return}
+      if(pf.lastModified&&Date.now()-pf.lastModified>5*60000){e.textContent='That photo is old. Take a new photo right now with the camera.';return}
+      if(locSt==='wait'){e.textContent='Still getting your location. Wait a few seconds and tap Save again.';return}
+    }
     b.disabled=true;b.textContent='Saving…';
-    compress($('#ph',d).files[0]).then(function(img){return call('submitCheck',{shift:S.shift,post:post,guardId:gid,presence:$('#pr',d).value,type:$('#ty',d).value,related:$('#rv',d).value,remark:$('#rm',d).value,photo:img})}).then(function(r){
+    compress(pf).then(function(img){return call('submitCheck',{shift:S.shift,post:post,guardId:gid,presence:pres,type:$('#ty',d).value,related:$('#rv',d).value,remark:$('#rm',d).value,photo:img,lat:loc?loc.lat:undefined,lng:loc?loc.lng:undefined,acc:loc?loc.acc:undefined})}).then(function(r){
       b.disabled=false;b.textContent='Save check';
-      if(!r.ok){$('#ce',d).textContent=r.error;return}
-      d.querySelector('.sheet').innerHTML='<h2>Saved ✓</h2>'+(r.flags.length?r.flags.map(function(f){return '<div class="flag '+(/^(DOUBLE|ABSENT|NEW)/.test(f)?'':'info')+'">'+esc(f)+'</div>'}).join(''):'<div class="flag ok">All fine. No warnings.</div>')+'<button class="btn" id="ok">Done</button>'+
-        (r.flags.some(function(f){return /^(DOUBLE|ABSENT)/.test(f)})?'<button class="btn r" id="ri">Raise an issue about this</button>':'');
+      if(!r.ok){e.textContent=r.error;return}
+      d.querySelector('.sheet').innerHTML='<h2>Saved ✓</h2>'+(r.flags.length?r.flags.map(function(f){return '<div class="flag '+(/^(DOUBLE|ABSENT|NEW|SAME PHOTO|NO LOCATION|LOCATION|SHIFT NOT)/.test(f)?'':'info')+'">'+esc(f)+'</div>'}).join(''):'<div class="flag ok">All fine. No warnings.</div>')+'<button class="btn" id="ok">Done</button>'+
+        (r.flags.some(function(f){return /^(DOUBLE|ABSENT|SAME PHOTO)/.test(f)})?'<button class="btn r" id="ri">Raise an issue about this</button>':'');
       $('#ok',d).onclick=function(){d.remove();viewRound()};
       var ri=$('#ri',d);if(ri)ri.onclick=function(){d.remove();S.prefill={post:post,category:r.flags.some(function(f){return /^ABSENT/.test(f)})?'Guard absent':'Other',description:r.flags.join('. ')};S.tab='raise';main()}})};
 }
@@ -319,6 +324,16 @@ function viewToday(){
        return '<div class="card" style="'+(warn?'border-color:var(--red)':'')+'"><b>'+esc(p)+'</b><div><span class="muted">Day</span><br>'+line(g.Day)+'</div><div><span class="muted">Night</span><br>'+line(g.Night)+'</div></div>'}).join('')+'</div>';
   });
 }
+function editGuard(id,done){
+  var g=gInfo(id);
+  var d=modal('<h2>'+esc(g.name)+'</h2><div class="f"><label>Shift</label><select id="eh"><option value="Day">Day (8 AM to 8 PM)</option><option value="Night">Night (8 PM to 8 AM)</option></select></div><div class="f"><label>Agency</label><select id="ea"><option value="Sainik">Sainik</option><option value="Avenger">Avenger</option></select></div><div class="f"><label>Usual post</label><select id="ep"><option value="">—</option>'+S.posts.map(function(p){return '<option>'+esc(p)+'</option>'}).join('')+'</select></div><div class="f"><label>Phone</label><input id="eph" type="tel"></div><div class="err" id="ee"></div><button class="btn" id="es">Save</button><button class="btn o" id="ec">Cancel</button>');
+  $('#eh',d).value=g.shift||'Day';$('#ea',d).value=g.agency||'Sainik';$('#ep',d).value=g.post||'';$('#eph',d).value=g.phone||'';
+  $('#ec',d).onclick=function(){d.remove()};
+  $('#es',d).onclick=function(){var b=this;b.disabled=true;b.textContent='Saving…';
+    call('updateGuard',{id:id,shift:$('#eh',d).value,agency:$('#ea',d).value,post:$('#ep',d).value,phone:$('#eph',d).value}).then(function(r){b.disabled=false;b.textContent='Save';
+      if(!r.ok){$('#ee',d).textContent=r.error;return}
+      S.guards=S.guards.map(function(x){return x.id===id?r.guard:x});d.remove();toast('Saved');if(done)done()})}
+}
 function viewGuards(){
   var m=$('#mn');m.innerHTML='<button class="btn o s" data-tab-go="home">← Home</button><h2>Guards</h2><div class="f"><input id="gq" placeholder="Search name or number"></div><div id="gl" class="muted">Loading…</div>';goBtns(m);
   call('bootstrap').then(function(b){if(b.ok&&b.guards)S.guards=b.guards;return call('checks',{from:ymd(-29),to:ymd(0)})}).then(function(r){
@@ -327,12 +342,15 @@ function viewGuards(){
     r.checks.forEach(function(c){if(!c.guardId)return;if(!last[c.guardId]||c.time>last[c.guardId].time)last[c.guardId]=c;if(c.presence!=='Absent')cnt[c.guardId]=(cnt[c.guardId]||0)+1;if(/DOUBLE/.test(c.flags))bad[c.guardId]=(bad[c.guardId]||0)+1});
     var gs=(S.guards||[]).slice().sort(function(a,b){return ((last[b.id]||{}).time||'').localeCompare((last[a.id]||{}).time||'')});
     function draw(q){
+      gs=(S.guards||[]).slice().sort(function(a,b){return ((last[b.id]||{}).time||'').localeCompare((last[a.id]||{}).time||'')});
       q=(q||'').toLowerCase();var l=gs.filter(function(g){return !q||(g.name+' '+g.phone+' '+g.id).toLowerCase().indexOf(q)>-1});
       $('#gl').className='';$('#gl').innerHTML=l.length?l.map(function(g){var c=last[g.id];
         return '<div class="card" style="flex-direction:row;gap:12px;align-items:flex-start;margin-bottom:10px">'+(miniPh(g.photo,72)||'<div style="width:72px;height:72px;border-radius:8px;background:var(--line)"></div>')+
-          '<div style="flex:1;min-width:0"><b>'+esc(g.name)+'</b> <span class="muted">'+esc(g.id)+'</span><div style="font-size:14px">'+phoneLinks(g.phone)+'</div>'+
+          '<div style="flex:1;min-width:0"><b>'+esc(g.name)+'</b> <span class="muted">'+esc(g.id)+'</span> '+(g.shift?'<span class="chip">'+esc(g.shift)+'</span>':'<span class="chip red">No shift</span>')+' <span class="chip">'+esc(g.agency||'Sainik')+'</span><div style="font-size:14px">'+phoneLinks(g.phone)+'</div>'+
           '<div class="muted" style="font-size:13px">'+(c?'Last seen: '+esc(c.post)+' · '+esc(c.shift)+' · '+esc(c.date.slice(5))+' ('+esc(c.presence)+')':'Not seen in the last 30 days')+'</div>'+
-          '<div class="muted" style="font-size:13px">'+(cnt[g.id]||0)+' shifts in 30 days'+(bad[g.id]?' · <span class="chip red">'+bad[g.id]+' double-duty</span>':'')+'</div></div></div>'}).join(''):'<div class="muted">No guards found.</div>'}
+          '<div class="muted" style="font-size:13px">'+(cnt[g.id]||0)+' shifts in 30 days'+(bad[g.id]?' · <span class="chip red">'+bad[g.id]+' double-duty</span>':'')+'</div>'+(S.role!=='supervisor'?'<button class="btn o s" data-eg="'+esc(g.id)+'" style="margin-top:6px">Edit shift / agency</button>':'')+'</div></div>'}).join(''):'<div class="muted">No guards found.</div>'}
+    function bindEdit(){[].forEach.call(document.querySelectorAll('[data-eg]'),function(b){b.onclick=function(){editGuard(b.dataset.eg,function(){draw($('#gq').value)})}})}
+    var _draw=draw;draw=function(q){_draw(q);bindEdit()};
     draw('');$('#gq').oninput=function(){draw(this.value)};
   });
 }
@@ -341,10 +359,59 @@ function periodRange(k){
   if(k==='month'){var d=ymd(0);return [d.slice(0,8)+'01',d]}
   if(k==='last'){var t=new Date(Date.now()+5.5*36e5);var f=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth()-1,1)),l=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),0));return [f.toISOString().slice(0,10),l.toISOString().slice(0,10)]}
   return [ymd(0),ymd(0)]}
+function rtToggle(cur){return '<div class="seg" id="rt" style="margin-bottom:8px"><button data-rt="gate" aria-pressed="'+(cur==='gate')+'">Gate report</button><button data-rt="agency" aria-pressed="'+(cur==='agency')+'">Agency bill check</button></div>'}
+function wireToggle(m){[].forEach.call(m.querySelectorAll('[data-rt]'),function(b){b.onclick=function(){S.rt=b.dataset.rt;viewReport()}})}
+function prevDay(d){return new Date(new Date(d+'T00:00:00Z').getTime()-864e5).toISOString().slice(0,10)}
+function csvDownload(name,rows){var t=rows.map(function(r){return r.map(function(c){c=String(c==null?'':c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(',')}).join('\n');var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},500)}
+function viewAgency(){
+  var m=$('#mn'),mk=S.am||'month';
+  m.innerHTML=rtToggle('agency')+'<div class="f"><label>Month</label><select id="am"><option value="month">This month, up to yesterday</option><option value="last">Last month</option></select></div><div id="ar" class="muted">Loading…</div>';
+  wireToggle(m);$('#am').value=mk;$('#am').onchange=function(){S.am=this.value;viewAgency()};
+  var r0=periodRange(mk),end=mk==='month'?ymd(-1):r0[1];
+  if(end<r0[0]){$('#ar').textContent='The month has just started. The report is available from tomorrow.';return}
+  Promise.all([call('bootstrap'),call('checks',{from:r0[0],to:ymd(0)>r0[1]?r0[1]:ymd(0)})]).then(function(rs){
+    if(!rs[1].ok){$('#ar').innerHTML='<span class="err">'+esc(rs[1].error)+'</span>';return}
+    if(rs[0].ok)S.guards=rs[0].guards;
+    var days=dDays(r0[0],end),EX=(window.SUP_CONFIG||{}).expected||{},CFG=(window.SUP_CONFIG||{}).agencies||{},gm={};S.guards.forEach(function(g){gm[g.id]=g});
+    var credit={},absent={},seenDays={},seenPost={};
+    rs[1].checks.forEach(function(c){
+      var g=gm[c.guardId],sh=(g&&g.shift)||c.shift,d=c.date,x=(String(c.time).match(/(\d+):(\d+)/)||[0,0,0]);
+      if(sh==='Night'&&(+x[1])*60+ +x[2]<720)d=prevDay(d);
+      if(d>end||d<r0[0])return;
+      if(c.presence==='Absent'){absent[c.post+'|'+sh+'|'+d]=1;return}
+      if(!g)return;var ag=g.agency||'Sainik',k=c.post+'|'+sh+'|'+d+'|'+ag;
+      (credit[k]=credit[k]||{})[g.id]=1;(seenDays[g.id]=seenDays[g.id]||{})[d]=1;(seenPost[g.id]=seenPost[g.id]||{})[c.post]=1});
+    var out='',csv=[['Agency','Gate','Shift','Contracted per day','Duties due','Verified present','Marked absent','Not verified','Verified %']],wa={};
+    ['Sainik','Avenger'].forEach(function(A){
+      var rows=[],T={due:0,ver:0,abs:0,nv:0},extra=[],absList=[];
+      S.posts.forEach(function(p){['Day','Night'].forEach(function(sh){
+        var exp=((EX[p]||{})[sh]||{})[A]||0,shared=Object.keys((EX[p]||{})[sh]||{}).length>1,ver=0,ab=0,ex=0;
+        days.forEach(function(d){var v=Object.keys(credit[p+'|'+sh+'|'+d+'|'+A]||{}).length;ver+=Math.min(v,exp);if(v>exp)ex++;
+          if(absent[p+'|'+sh+'|'+d]&&v<exp&&!shared){ab+=exp-v;absList.push(p+' '+sh+' '+dShort(d))}});
+        var due=exp*days.length;
+        if(exp||ex){var nv=Math.max(0,due-ver-ab);rows.push({p:p,sh:sh,exp:exp,due:due,ver:ver,ab:ab,nv:nv,ex:ex});T.due+=due;T.ver+=ver;T.abs+=ab;T.nv+=nv}})});
+      if(!rows.length)return;
+      var pct=T.due?Math.round(T.ver/T.due*100):0,key=A==='Avenger'?'Avengers':'Sainik',cfg=CFG[key]||{name:A};
+      rows.forEach(function(r){csv.push([A,r.p,r.sh,r.exp,r.due,r.ver,r.ab,r.nv,r.due?Math.round(r.ver/r.due*100)+'%':''])});
+      csv.push([A,'TOTAL','','',T.due,T.ver,T.abs,T.nv,pct+'%']);
+      var gl=(S.guards||[]).filter(function(g){return (g.agency||'Sainik')===A&&g.status!=='Left'}).map(function(g){return {g:g,n:Object.keys(seenDays[g.id]||{}).length,posts:Object.keys(seenPost[g.id]||{})}}).sort(function(a,b){return b.n-a.n});
+      wa[A]={cfg:cfg,key:key,txt:'Aljamea-tus-Saifiyah security: duty check, '+cfg.name+'\n'+dShort(r0[0])+' to '+dShort(end)+'\nDuties due: '+T.due+'\nVerified present: '+T.ver+' ('+pct+'%)\nMarked absent: '+T.abs+(absList.length?' ('+absList.slice(0,8).join(', ')+(absList.length>8?'…':'')+')':'')+'\nNot verified (no scan): '+T.nv+'\nPlease check and confirm.\n- Siyanat, Aljamea'};
+      out+='<div class="card" style="gap:8px"><div class="row" style="justify-content:space-between"><b style="font-size:18px">'+esc(cfg.name)+'</b><span class="chip '+(pct>=90?'grn':pct>=60?'yel':'red')+'">'+pct+'% verified</span></div>'+
+        '<div class="muted">'+T.ver+' of '+T.due+' contracted duties were seen present by a scan · '+T.abs+' marked absent · '+T.nv+' not verified</div>'+
+        '<div class="scr"><table><tr><th>Gate</th><th>Shift</th><th>Per day</th><th>Due</th><th>Seen</th><th>Absent</th><th>No scan</th></tr>'+rows.map(function(r){return '<tr><td>'+esc(r.p)+'</td><td>'+r.sh+'</td><td>'+r.exp+'</td><td>'+r.due+'</td><td>'+r.ver+'</td><td>'+(r.ab?'<span class="chip red">'+r.ab+'</span>':'0')+'</td><td>'+r.nv+'</td></tr>'}).join('')+'<tr><td><b>Total</b></td><td></td><td></td><td><b>'+T.due+'</b></td><td><b>'+T.ver+'</b></td><td><b>'+T.abs+'</b></td><td><b>'+T.nv+'</b></td></tr></table></div>'+
+        (rows.some(function(r){return r.ex})?'<div class="flag info">More guards than the contract were seen at: '+rows.filter(function(r){return r.ex}).map(function(r){return esc(r.p)+' '+r.sh+' ('+r.ex+' days)'}).join(', ')+'. Check whether these are extra guards you are billed for, or not in the contract.</div>':'')+
+        '<details><summary class="muted" style="cursor:pointer">Guards of this agency ('+gl.length+')</summary><div class="scr"><table><tr><th>Guard</th><th>Shift</th><th>Days seen</th><th>Posts</th></tr>'+gl.map(function(x){return '<tr><td>'+esc(x.g.name)+'</td><td>'+esc(x.g.shift||'?')+'</td><td>'+x.n+'</td><td>'+esc(x.posts.join(', '))+'</td></tr>'}).join('')+'</table></div></details>'+
+        '<div class="row"><button class="btn o s" data-csv="'+A+'">Download CSV</button><button class="btn g s" data-wa="'+A+'">Send summary on WhatsApp</button></div></div>'});
+    $('#ar').outerHTML='<div id="ar" style="display:flex;flex-direction:column;gap:12px">'+(out||'<div class="muted">Nothing to report. Set the contracted guards per gate in config.js.</div>')+
+      '<div class="flag info" style="margin:0"><b>How to read this.</b> A duty is "seen" only when a Supervisor or Control Room scan found a guard of that agency present at that gate and shift. "No scan" is not the same as absent: nobody scanned that gate in that shift. Contracted guards per gate come from the October invoices and can be changed in config.js. Scanning began on 19 Nov, so earlier days will show as not verified.</div></div>';
+    [].forEach.call(document.querySelectorAll('[data-csv]'),function(b){b.onclick=function(){csvDownload('agency-check-'+b.dataset.csv+'-'+r0[0].slice(0,7)+'.csv',csv.filter(function(r,i){return i===0||r[0]===b.dataset.csv}))}});
+    [].forEach.call(document.querySelectorAll('[data-wa]'),function(b){b.onclick=function(){var w=wa[b.dataset.wa],n=((w.cfg.whatsapp)||'').replace(/\D/g,'');window.open('https://wa.me/'+(n.length===10?'91'+n:n)+'?text='+encodeURIComponent(w.txt),'_blank')}});
+  })}
 function viewReport(){
   var m=$('#mn'),pk=S.period||'30';
-  m.innerHTML='<h2>Gate report</h2><div class="f"><label>Period</label><select id="pk"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="month">This month</option><option value="last">Last month</option></select></div><div id="rp" class="muted">Loading…</div>';
-  $('#pk').value=pk;$('#pk').onchange=function(){S.period=this.value;viewReport()};
+  if(S.role!=='supervisor'&&S.rt==='agency'){viewAgency();return}
+  m.innerHTML=rtToggle('gate')+'<div class="f"><label>Period</label><select id="pk"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="month">This month</option><option value="last">Last month</option></select></div><div id="rp" class="muted">Loading…</div>';
+  $('#pk').value=pk;$('#pk').onchange=function(){S.period=this.value;viewReport()};wireToggle(m);
   var r0=periodRange(pk);
   Promise.all([loadChecks(r0[0],r0[1]),call('issues')]).then(function(rs){
     if(!rs[0].ok){$('#rp').innerHTML='<span class="err">'+esc(rs[0].error)+'</span>';return}
@@ -466,11 +533,17 @@ function heatmap(days,posts,map){
       s+='<rect x="'+(LW+i*cw+1)+'" y="'+(y+k*(rh+gap))+'" width="'+(cw-2)+'" height="'+rh+'" rx="2.5" fill="'+f+'"'+(st?'':' opacity=".55"')+'><title>'+esc(p)+' · '+dShort(d)+' · '+sh+': '+txt+'</title></rect>'})})});
   return '<div class="scr"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:'+Math.min(W,560)+'px" role="img" aria-label="Rounds completed by gate and day">'+s+'</svg></div>'+
    '<div class="lg"><span><i style="background:var(--c1)"></i>Checked</span><span><i style="background:var(--c4)"></i>Late guard</span><span><i style="background:var(--bad)"></i>Absent found</span><span><i style="background:var(--line)"></i>Not checked</span><span class="muted">Top row Day, bottom row Night</span></div>'}
+function roundMatrix(list,days){
+  var ids=['S1','S2','S3','S4','C1','C2','C3','C4'],by={};list.forEach(function(r){by[r.date+'|'+r.id]=r});
+  var cell=function(r){if(!r)return '<td></td>';var c=r.status==='done'?'var(--ok)':r.status==='missed'?'var(--bad)':r.status==='open'?'var(--c4)':'var(--line)',tx=r.status==='done'?'✓':r.status==='missed'?'✗':r.status==='open'?'…':'·';
+    return '<td style="text-align:center"><span title="'+esc(r.name+' · '+r.date+' · '+r.done+' of '+r.total+' gates ('+r.status+')')+'" style="display:inline-block;min-width:26px;padding:2px 0;border-radius:6px;background:'+c+';color:'+(r.status==='upcoming'?'var(--mute)':'#fff')+';font-weight:800">'+tx+'</span></td>'};
+  var rows=days.slice().reverse().filter(function(d){return ids.some(function(i){return by[d+'|'+i]})}).slice(0,14).map(function(d){return '<tr><td>'+dShort(d)+'</td>'+ids.map(function(i){return cell(by[d+'|'+i])}).join('')+'</tr>'}).join('');
+  return '<div class="scr"><table><tr><th>Day</th>'+ids.map(function(i){return '<th style="text-align:center">'+i+'</th>'}).join('')+'</tr>'+rows+'</table></div><div class="lg"><span><i style="background:var(--ok)"></i>Done</span><span><i style="background:var(--bad)"></i>Missed</span><span><i style="background:var(--c4)"></i>Open now</span><span class="muted">S1 9:30, S2 12:30, S3 3:30 PM, S4 7 PM · C1 9:30 PM, C2 1 AM, C3 4:30 AM, C4 7:30 AM</span></div>'}
 function viewHeadDash(){
   var m=$('#mn');m.classList.add('wide');var p=S.dp||'30',rg=dRange(p);
   m.innerHTML=DASH_CSS+'<div class="dh"><h2>Head Office dashboard</h2><div class="seg" id="dps"><button data-p="7"'+(p==='7'?' aria-pressed="true"':'')+'>7 days</button><button data-p="30"'+(p==='30'?' aria-pressed="true"':'')+'>30 days</button><button data-p="month"'+(p==='month'?' aria-pressed="true"':'')+'>This month</button></div></div><div id="hm" class="muted">Loading…</div>';
   [].forEach.call(document.querySelectorAll('#dps button'),function(b){b.onclick=function(){S.dp=b.dataset.p;viewHeadDash()}});
-  Promise.all([call('issues',{days:62}),call('checks',{from:rg[0],to:rg[1]})]).then(function(rs){
+  Promise.all([call('issues',{days:62}),call('checks',{from:rg[0],to:rg[1]}),call('rounds',{days:Math.min(31,dDays(rg[0],rg[1]).length)}),call('alerts')]).then(function(rs){
     if(!rs[0].ok||!rs[1].ok){$('#hm').innerHTML='<span class="err">'+esc(rs[0].ok?rs[1].error:rs[0].error)+'</span>';return}
     var all=rs[0].issues,cs=rs[1].checks,days=dDays(rg[0],rg[1]),inP=function(d){return d>=rg[0]&&d<=rg[1]};
     S.issues=all;
@@ -490,18 +563,22 @@ function viewHeadDash(){
     var absI=Object.keys(absG).map(function(k){return {l:k,v:absG[k]}}).sort(function(a,b){return b.v-a.v}).slice(0,8);
     var map={};cs.forEach(function(c){var k=c.post+'|'+c.date+'|'+c.shift,st=c.presence==='Absent'?'abs':c.presence==='Late'?'late':'ok',o=map[k];if(!o||(o==='abs'&&st!=='abs')||(o==='ok'&&st==='late'))map[k]=st});
     var slots=S.posts.length*2*days.length,done=Object.keys(map).length,agency={Sainik:0,Avenger:0};
+    var RL=rs[2].ok?rs[2].rounds:[],ended=RL.filter(function(r){return r.status==='done'||r.status==='missed'}),rDone=ended.filter(function(r){return r.status==='done'}).length,rMiss=ended.length-rDone;
+    var AL=rs[3].ok?rs[3].alerts:[];S.alerts=AL;
     all.forEach(function(i){var f=(i.log||[]).some(function(l){return /Forwarded to Sainik/.test(l.remark||'')}),g=(i.log||[]).some(function(l){return /Forwarded to Avenger/.test(l.remark||'')});if(inP(i.created.slice(0,10))){if(f)agency.Sainik++;if(g)agency.Avenger++}});
     var tbl='<details><summary class="muted" style="cursor:pointer">View as table</summary><div class="scr"><table><tr><th>Day</th><th>Raised</th><th>Resolved</th></tr>'+days.map(function(d,i){return '<tr><td>'+dShort(d)+'</td><td>'+perDayR[i]+'</td><td>'+perDayS[i]+'</td></tr>'}).join('')+'</table></div></details>';
     var html='<div class="dch"><div class="kpis">'+
       kpi('Issues raised',raised.length,rate==null?'':rate+'% resolved')+
       kpi('Resolved',solved.length,avg==null?'':'avg '+(avg<48?Math.round(avg*10)/10+' h':Math.round(avg/24*10)/10+' days')+' to solve')+
       kpi('Open now',open.length,od.length?od.length+' overdue (24 h+)':'none overdue',od.length?'var(--red)':'')+
-      kpi('Rounds done',done,slots?Math.round(done/slots*100)+'% of gate-shifts':'')+
+      kpi('Rounds on time',ended.length?Math.round(rDone/ended.length*100)+'%':'–',ended.length?rDone+' of '+ended.length+' done'+(rMiss?', '+rMiss+' missed':''):'no round has ended yet',rMiss?'var(--red)':'')+
       kpi('Absent found',abs,late?late+' late':'',abs?'var(--red)':'')+
       kpi('Double duty',dbl.length,newg+' new guards',dbl.length?'var(--red)':'')+
       kpi('Camera reports',cam.length,'by Control Room')+
       kpi('Guards seen',Object.keys(cs.reduce(function(o,c){if(c.guardId)o[c.guardId]=1;return o},{})).length,'different guards in rounds')+
     '</div><div class="dg" style="margin-top:12px">'+
+      '<div class="w2">'+alertsCard(AL,5)+'</div>'+
+      '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. Supervisor S1 to S4, Control Room C1 to C4.</div>'+roundMatrix(RL,days)+'</div>'+
       '<div class="card w2"><div class="ct">Issues raised vs resolved, per day</div><div class="lg"><span><i style="background:var(--c1)"></i>Raised</span><span><i style="background:var(--c2)"></i>Resolved</span></div>'+dailyChart(days,perDayR,perDayS)+tbl+'</div>'+
       '<div class="card"><div class="ct">Issues by category</div><div class="cs">Raised in this period</div>'+hbars(catI,'var(--c1)')+'</div>'+
       '<div class="card"><div class="ct">Issues by gate</div><div class="cs">Raised in this period, with how many are still open</div>'+hbars(gateI,'var(--c1)')+'</div>'+
@@ -512,13 +589,27 @@ function viewHeadDash(){
       '<div class="card"><div class="ct">Latest camera reports</div>'+(cam.length?cam.slice(-5).reverse().map(issueLine).join(''):'<div class="muted">None in this period.</div>')+'</div>'+
       rosterCard().replace('<div class="card"','<div class="card w2"')+
     '</div><div class="row" style="margin-top:12px"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">See today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button></div></div>';
-    $('#hm').outerHTML='<div id="hm">'+html+'</div>';var root=$('#hm');goBtns(root);fillGateInstr();
+    $('#hm').outerHTML='<div id="hm">'+html+'</div>';var root=$('#hm');goBtns(root);fillGateInstr();wireAlerts(root,AL);
   })}
+/* ---------- rounds and alerts ---------- */
+function rChip(r){var m={done:['grn','Done'],open:['yel','Open now'],missed:['red','Missed'],upcoming:['','Later']}[r.status]||['',r.status];return '<span class="chip '+m[0]+'">'+m[1]+'</span>'}
+function roundsCard(list){
+  var t=ymd(0),y=ymd(-1),show=list.filter(function(r){return (r.date===t)||(r.date===y&&r.status!=='upcoming'&&r.role==='control')}).slice().reverse();
+  if(S.role==='control')show=show.filter(function(r){return r.date===t||r.status==='missed'||r.status==='open'||r.status==='done'});
+  var open=show.filter(function(r){return r.status==='open'})[0];
+  var h='<div class="card"><b>Rounds</b>'+(open?'<div class="flag ok" style="margin:0"><b>'+esc(open.name)+'</b> is open until '+esc(open.to)+'. '+open.done+' of '+open.total+' gates checked'+(open.missing.length?'. Still to check: '+esc(open.missing.slice(0,5).join(', '))+(open.missing.length>5?'…':''):'. All done.')+'</div><button class="btn s" data-tab-go="round">Start round</button>':'<div class="muted">No round is open right now.</div>');
+  h+=show.map(function(r){return '<div class="row" style="justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:6px"><span><b>'+esc(r.name)+'</b><br><small class="muted">'+(r.date===t?'':'Yesterday ')+esc(r.from)+' to '+esc(r.to)+(r.status==='upcoming'?'':' · '+r.done+' of '+r.total+' gates')+'</small></span>'+rChip(r)+'</div>'}).join('');
+  return h+'<div class="muted">A round counts as done when at least '+Math.round((S.minCover||0.9)*100)+'% of gates are checked inside its time.</div></div>'}
+function alertsCard(list,n){
+  n=n||6;var lv={high:'red',medium:'yel',info:''};
+  return '<div class="card"><div class="row" style="justify-content:space-between"><b>Alerts</b>'+(list.length>n?'<button class="btn o s" id="aall">All alerts ('+list.length+')</button>':'')+'</div>'+
+   (list.length?list.slice(0,n).map(function(a){return '<div style="border-top:1px solid var(--line);padding-top:6px"><span class="chip '+(lv[a.level]||'')+'">'+esc(a.level==='high'?'Important':a.level==='medium'?'Check':'Info')+'</span> <small class="muted">'+esc(a.time.slice(5,16))+'</small><div>'+esc(a.message)+'</div></div>'}).join(''):'<div class="flag ok" style="margin:0">No alerts. Everything is on track.</div>')+'</div>'}
+function wireAlerts(root,list){var b=$('#aall',root);if(b)b.onclick=function(){var d=modal('<h2>All alerts</h2>'+list.map(function(a){return '<div style="border-bottom:1px solid var(--line);padding:6px 0"><small class="muted">'+esc(a.time.slice(5,16))+' · '+esc(a.level)+'</small><div>'+esc(a.message)+'</div></div>'}).join('')+'<button class="btn o" id="ax">Close</button>');$('#ax',d).onclick=function(){d.remove()}}}
 function viewHome(){
   var m=$('#mn');m.classList.remove('wide');if(S.role==='head'){viewHeadDash();return}
   m.innerHTML='<h2>'+({supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role])+' dashboard</h2><div id="hm" class="muted">Loading…</div>';
   var wk=S.role==='head'?[ymd(-6),ymd(0)]:null;
-  var calls=[loadChecks(),call('issues')];if(wk)calls.push(call('checks',{from:wk[0],to:wk[1]}));
+  var calls=[loadChecks(),call('issues')];if(wk)calls.push(call('checks',{from:wk[0],to:wk[1]}));else{calls.push(call('rounds',{days:2}));calls.push(call('alerts'))}
   Promise.all(calls).then(function(rs){
     if(!rs[0].ok||!rs[1].ok){$('#hm').innerHTML='<span class="err">'+esc(rs[0].ok?rs[1].error:rs[0].error)+'</span>';return}
     S.issues=vis(rs[1].issues);var cs=S.checks,all=S.issues,openI=all.filter(function(i){return i.status!=='Solved'}),od=all.filter(isOverdue);
@@ -530,11 +621,12 @@ function viewHome(){
       var todo=S.posts.filter(function(p){return !cur[p]}),mine=openI.filter(function(i){return i.raisedBy===S.name});
       html+='<div class="card"><b>Round progress · '+sh+' shift</b>'+covLine(sh+' shift',S.posts.length-todo.length,S.posts.length)+
         (todo.length?'<div class="muted">Still to check:</div><div class="row">'+todo.slice(0,6).map(function(p){return '<button class="chip yel" style="border:0;font:inherit;font-weight:800" data-chk="'+esc(p)+'">'+esc(p)+'</button>'}).join('')+(todo.length>6?'<span class="muted">+'+(todo.length-6)+' more</span>':'')+'</div>':'<div class="flag ok">All gates checked this shift.</div>')+
-        '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+
+        '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+(rs[2]&&rs[2].ok?roundsCard(rs[2].rounds):'')+
         '<div class="card"><b>My open issues ('+mine.length+')</b>'+(mine.length?mine.slice(0,4).map(issueLine).join(''):'<div class="muted">None. Everything you raised is solved.</div>')+'</div>'+rosterCard();
     }else if(S.role==='control'){
       var un=openI.filter(function(i){return i.status==='Open'}),urg=openI.filter(function(i){return i.priority==='Urgent'});
-      html+='<div class="row">'+tile('Open issues',openI.length)+tile('Overdue',od.length,od.length?'err':'')+'</div><div class="row">'+tile('Not acknowledged',un.length,un.length?'err':'')+tile('Urgent',urg.length,urg.length?'err':'')+'</div>'+
+      var al=rs[3]&&rs[3].ok?rs[3].alerts:[];S.alerts=al;
+      html+=alertsCard(al)+(rs[2]&&rs[2].ok?roundsCard(rs[2].rounds):'')+'<div class="row">'+tile('Open issues',openI.length)+tile('Overdue',od.length,od.length?'err':'')+'</div><div class="row">'+tile('Not acknowledged',un.length,un.length?'err':'')+tile('Urgent',urg.length,urg.length?'err':'')+'</div>'+
         '<div class="card"><b>Needs action now</b>'+((un.concat(od.filter(function(i){return un.indexOf(i)<0}))).slice(0,5).map(issueLine).join('')||'<div class="muted">Nothing waiting.</div>')+'<button class="btn o s" data-tab-go="issues">All issues</button></div>'+
         '<div class="card"><b>Coverage today</b>'+covLine('Day',nd,S.posts.length)+covLine('Night',nn,S.posts.length)+(S.posts.filter(function(p){return !cur[p]}).length?'<div class="muted">Not yet checked ('+sh.toLowerCase()+'): '+esc(S.posts.filter(function(p){return !cur[p]}).join(', '))+'</div>':'')+'<button class="btn o s" data-tab-go="today">See today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button></div>'+
         '<div class="card"><b>Warnings today ('+warn.length+')</b>'+(warn.length?warn.slice(0,6).map(function(c){return '<div class="flag">'+esc(c.post)+' · '+c.shift+' · '+esc(c.guard||'no guard')+'<br>'+esc(c.flags)+'</div>'}).join(''):'<div class="muted">No warnings today.</div>')+'</div>'+rosterCard();
@@ -550,7 +642,7 @@ function viewHome(){
         '<div class="row"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>';
     }
     $('#hm').outerHTML='<div id="hm" style="display:flex;flex-direction:column;gap:12px">'+html+'</div>';
-    var root=$('#hm');goBtns(root);fillGateInstr();
+    var root=$('#hm');goBtns(root);fillGateInstr();if(S.role==='control')wireAlerts(root,S.alerts||[]);
     [].forEach.call(root.querySelectorAll('[data-chk]'),function(b){b.onclick=function(){S.shift=sh;openCheck(b.dataset.chk)}});
   });
 }

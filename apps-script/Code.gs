@@ -6,12 +6,13 @@
 var TZ = 'Asia/Kolkata';
 var HEAD = {
   Posts: ['Post'],
-  Guards: ['ID', 'Name', 'Phone', 'PhotoId', 'AddedBy', 'AddedAt', 'RegularPost', 'RegularShift', 'Status'],
-  Checks: ['Time', 'Date', 'Shift', 'Post', 'GuardId', 'Guard', 'Presence', 'Type', 'Related', 'Remark', 'PhotoId', 'By', 'Flags'],
+  Guards: ['ID', 'Name', 'Phone', 'PhotoId', 'AddedBy', 'AddedAt', 'RegularPost', 'RegularShift', 'Status', 'Agency'],
+  Checks: ['Time', 'Date', 'Shift', 'Post', 'GuardId', 'Guard', 'Presence', 'Type', 'Related', 'Remark', 'PhotoId', 'By', 'Flags', 'Role', 'Lat', 'Lng', 'Acc', 'Hash'],
   Issues: ['ID', 'Created', 'Post', 'Category', 'Priority', 'Description', 'PhotoId', 'RaisedBy', 'Status', 'LastRemark', 'Updated', 'SolvedAt'],
   Log: ['Time', 'IssueID', 'By', 'Role', 'Action', 'Remark', 'PhotoId'],
   Settings: ['Key', 'Value'],
-  Users: ['Name', 'PIN', 'Role', 'Active']
+  Users: ['Name', 'PIN', 'Role', 'Active'],
+  Alerts: ['Time', 'Type', 'Key', 'Level', 'Message', 'Audience']
 };
 var POSTS = ['Gate 1', 'Gate 2', 'Gate 4', 'Gate 6 (Rabvat)', 'Gate 8 & 9', 'MVD Gate 10', 'Mahad Gate',
   'Masakin front gate', 'Masakin back gate', 'Raj Manzil', 'Yusufi Makan', 'Ezzy Makan', 'Funun-ul-Quran',
@@ -19,48 +20,78 @@ var POSTS = ['Gate 1', 'Gate 2', 'Gate 4', 'Gate 6 (Rabvat)', 'Gate 8 & 9', 'MVD
 
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 function now_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss'); }
-/** Double duty is judged by the CLOCK, not the label: Day = 9:00-19:30, Night = 20:30-7:30. Handover times (7:30-9:00, 19:30-20:30) count as neither. */
-function dutyClass_(time) {
-  var m = String(time || '').match(/(\d+):(\d+)/); if (!m) return '';
-  var mins = Number(m[1]) * 60 + Number(m[2]);
-  if (mins >= 540 && mins < 1170) return 'Day';
-  if (mins >= 1230 || mins < 450) return 'Night';
+function ts_(t) { return new Date(String(t).replace(' ', 'T').replace(/T(\d):/, 'T0$1:') + '+05:30').getTime(); }
+function clockMin_(time) {
+  var m = String(time || '').match(/(\d+):(\d+)/); return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+}
+/** Shifts: Day 8 AM to 8 PM, Night 8 PM to 8 AM. */
+function shiftByClock_(time) { var x = clockMin_(time); return x >= 480 && x < 1200 ? 'Day' : 'Night'; }
+/** A guard is "outside his shift" only when clearly inside the OTHER shift. One hour either side of each handover is ignored. */
+function outsideShift_(regShift, time) {
+  var x = clockMin_(time);
+  if (x < 0) return false;
+  if (regShift === 'Day') return x >= 1260 || x < 420;
+  if (regShift === 'Night') return x >= 540 && x < 1140;
+  return false;
+}
+function dayBefore_(d) { var x = new Date(d + 'T12:00:00+05:30'); x.setDate(x.getDate() - 1); return Utilities.formatDate(x, TZ, 'yyyy-MM-dd'); }
+function distM_(a, b, c, d) {
+  var R = 6371000, r = Math.PI / 180, dLa = (c - a) * r, dLo = (d - b) * r;
+  var h = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(a * r) * Math.cos(c * r) * Math.sin(dLo / 2) * Math.sin(dLo / 2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function median_(a) { a = a.slice().sort(function (x, y) { return x - y; }); var n = a.length; return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2; }
+function roleOfName_(name, map) {
+  var n = String(name || '').trim().toLowerCase();
+  if (map && map[n]) return map[n];
+  if (n === 'control room') return 'control';
+  if (n === 'supervisor') return 'supervisor';
   return '';
 }
-function nearHandover_(time) {
-  var m = String(time || '').match(/(\d+):(\d+)/); if (!m) return false;
-  var x = Number(m[1]) * 60 + Number(m[2]);
-  return (x >= 360 && x < 600) || (x >= 1080 && x < 1320);
+function roleMap_() {
+  var o = {}; rows_('Users').forEach(function (u) { o[String(u.Name).trim().toLowerCase()] = String(u.Role).trim().toLowerCase(); }); return o;
 }
-/** Same guard, opposite windows, within 24h. If the two scans were done by DIFFERENT accounts (Supervisor in the evening, Control Room in the morning) and one is near a handover, they bookend ONE shift, so it is not double duty. */
-function isDouble_(timeA, byA, timeB, byB) {
-  var a = dutyClass_(timeA), b = dutyClass_(timeB);
-  if (!a || !b || a === b) return false;
-  if (byA !== byB && (nearHandover_(timeA) || nearHandover_(timeB))) return false;
-  return true;
+function doubleDutyMsg_(g, time) {
+  return 'DOUBLE DUTY: ' + g.Name + ' is registered for the ' + g.RegularShift + ' shift but was on post at ' + String(time).slice(11, 16).replace(/^(\d):/, '0$1:') + ' (' + shiftByClock_(time) + ' hours).';
 }
-function ts_(t) { return new Date(String(t).replace(' ', 'T').replace(/T(\d):/, 'T0$1:') + '+05:30').getTime(); }
-/** Run once from the editor to recompute DOUBLE DUTY flags on old rows. */
-function repairFlags() {
-  var sh = ss_().getSheetByName('Checks'), v = sh.getDataRange().getValues(), h = v[0], iT = h.indexOf('Time'), iG = h.indexOf('GuardId'), iP = h.indexOf('Presence'), iF = h.indexOf('Flags'), iPost = h.indexOf('Post'), iS = h.indexOf('Shift'), iD = h.indexOf('Date'), iBy = h.indexOf('By');
-  var n = 0;
-  for (var r = 1; r < v.length; r++) {
-    var parts = String(v[r][iF] || '').split(' | ').filter(function (x) { return x && x.indexOf('DOUBLE DUTY') !== 0; });
-    var cls = dutyClass_(v[r][iT]);
-    if (v[r][iG] && v[r][iP] !== 'Absent' && cls) {
-      var t = ts_(v[r][iT]), seen = {};
-      for (var k = 0; k < r; k++) {
-        if (v[k][iG] !== v[r][iG] || v[k][iP] === 'Absent') continue;
-        var tk = ts_(v[k][iT]), c2 = dutyClass_(v[k][iT]);
-        if (isDouble_(v[k][iT], v[k][iBy], v[r][iT], v[r][iBy]) && t - tk <= 24 * 3600 * 1000 && !seen[v[k][iPost] + c2]) {
-          seen[v[k][iPost] + c2] = 1;
-          parts.push('DOUBLE DUTY: ' + v[r][iG + 1] + ' was also at ' + v[k][iPost] + ' (' + c2 + ', ' + String(v[k][iT]).slice(0, 10) + ')');
-        }
-      }
+/** Run once from the editor: adds the new columns, creates the Alerts sheet, seeds each guard\'s shift and agency, repairs old flags. */
+function migrate() {
+  var ss = ss_();
+  ['Guards', 'Checks', 'Alerts'].forEach(function (name) {
+    var fresh = !ss.getSheetByName(name), sh = ss.getSheetByName(name) || ss.insertSheet(name), cols = HEAD[name].length;
+    if (fresh) sh.getRange(1, 1, sh.getMaxRows(), cols).setNumberFormat('@');
+    sh.getRange(1, 1, 1, cols).setValues([HEAD[name]]).setFontWeight('bold').setBackground('#1F3A5F').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  });
+  var st = settings_();
+  if (!st.min_cover) setSetting_('min_cover', '0.9');
+  if (!st.alert_email) setSetting_('alert_email', '');
+  var rm = roleMap_(), checks = rows_('Checks'), gsh = ss.getSheetByName('Guards'), gs = rows_('Guards'), seeded = 0;
+  var ch = ss.getSheetByName('Checks'), iRole = HEAD.Checks.indexOf('Role') + 1;
+  checks.forEach(function (c) { if (!c.Role) { var r = roleOfName_(c.By, rm); if (r) ch.getRange(c._row, iRole).setValue(r); } });
+  var iSh = HEAD.Guards.indexOf('RegularShift') + 1, iPo = HEAD.Guards.indexOf('RegularPost') + 1, iAg = HEAD.Guards.indexOf('Agency') + 1;
+  gs.forEach(function (g) {
+    var mine = checks.filter(function (c) { return c.GuardId === g.ID && c.Presence !== 'Absent'; });
+    if (!g.RegularShift && mine.length) {
+      var first = mine.filter(function (c) { return roleOfName_(c.By, rm) === 'supervisor'; })[0] || mine[0];
+      gsh.getRange(g._row, iSh).setValue(first.Shift); gsh.getRange(g._row, iPo).setValue(first.Post); seeded++;
     }
+    if (!g.Agency) gsh.getRange(g._row, iAg).setValue(/bouncer/i.test(g.Name) ? 'Avenger' : 'Sainik');
+  });
+  return { seeded: seeded, repaired: repairFlags() };
+}
+/** Recompute the DOUBLE DUTY flag on every old check, using each guard\'s registered shift. */
+function repairFlags() {
+  var ss = ss_(), sh = ss.getSheetByName('Checks'), gmap = {};
+  rows_('Guards').forEach(function (g) { gmap[g.ID] = g; });
+  var iF = HEAD.Checks.indexOf('Flags') + 1, n = 0;
+  rows_('Checks').forEach(function (c) {
+    var parts = String(c.Flags || '').split(' | ').filter(function (x) { return x && x.indexOf('DOUBLE DUTY') !== 0; });
+    var g = gmap[c.GuardId];
+    if (g && c.Presence !== 'Absent' && g.RegularShift && outsideShift_(g.RegularShift, c.Time)) parts.push(doubleDutyMsg_(g, c.Time));
     var nf = parts.join(' | ');
-    if (nf !== String(v[r][iF] || '')) { sh.getRange(r + 1, iF + 1).setValue(nf); n++; }
-  }
+    if (nf !== String(c.Flags || '')) { sh.getRange(c._row, iF).setValue(nf); n++; }
+  });
   return n;
 }
 function today_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'); }
@@ -170,6 +201,9 @@ function doPost(e) {
     switch (q.action) {
       case 'bootstrap': return json_(bootstrap_(role, by));
       case 'addGuard': return json_(addGuard_(q, by, role));
+      case 'updateGuard': return json_(updateGuard_(q, by, role));
+      case 'rounds': return json_(roundsOut_(role, q));
+      case 'alerts': return json_(alertsOut_(role));
       case 'submitCheck': return json_(submitCheck_(q, by, role));
       case 'raiseIssue': return json_(raiseIssue_(q, by, role));
       case 'issues': return json_(listIssues_(role, q));
@@ -186,29 +220,50 @@ function doPost(e) {
 
 function bootstrap_(role, name) {
   var s = settings_();
+  try { alertTick_(); } catch (e) {}
   return {
-    ok: true, role: role, name: name, overdueHours: Number(s.overdue_hours) || 24,
+    ok: true, role: role, name: name, overdueHours: Number(s.overdue_hours) || 24, rounds: ROUNDS, minCover: Number(s.min_cover) || 0.9,
     posts: rows_('Posts').map(function (r) { return r.Post; }).filter(String),
     guards: rows_('Guards').filter(function (g) { return g.Status !== 'Left'; }).map(guardOut_)
   };
 }
 function guardOut_(g) {
-  return { id: g.ID, name: g.Name, phone: g.Phone, photo: g.PhotoId, post: g.RegularPost, shift: g.RegularShift };
+  return { id: g.ID, name: g.Name, phone: g.Phone, photo: g.PhotoId, post: g.RegularPost, shift: g.RegularShift, agency: g.Agency };
 }
 
 function addGuard_(q, by, role) {
   if (role === 'head') return { ok: false, error: 'Not allowed' };
   var name = String(q.name || '').trim(), phone = String(q.phone || '').replace(/\D/g, '');
   if (name.length < 3) return { ok: false, error: 'Enter the full name' };
+  var shift = q.shift === 'Night' ? 'Night' : q.shift === 'Day' ? 'Day' : '';
+  if (!shift) return { ok: false, error: 'Choose his shift: Day or Night' };
+  var agency = q.agency === 'Avenger' ? 'Avenger' : 'Sainik';
+  if (role === 'supervisor' && !q.photo) return { ok: false, error: 'Take a photo of the guard with the camera' };
   var gs = rows_('Guards');
   for (var i = 0; i < gs.length; i++) {
     if (gs[i].Name.toLowerCase() === name.toLowerCase() || (phone && gs[i].Phone === phone))
       return { ok: false, error: 'Already registered: ' + gs[i].Name };
   }
   var id = 'G' + ('000' + (gs.length + 1)).slice(-4);
-  var g = { ID: id, Name: name, Phone: phone, PhotoId: photo_(q.photo, 'guard_' + id), AddedBy: by, AddedAt: now_(), RegularPost: '', RegularShift: '', Status: 'Active' };
+  var g = { ID: id, Name: name, Phone: phone, PhotoId: photo_(q.photo, 'guard_' + id), AddedBy: by, AddedAt: now_(), RegularPost: String(q.post || ''), RegularShift: shift, Status: 'Active', Agency: agency };
   add_('Guards', g);
   return { ok: true, guard: guardOut_(g) };
+}
+function updateGuard_(q, by, role) {
+  if (role === 'supervisor') return { ok: false, error: 'Only the Control Room or Head Office can change a guard\'s shift or agency' };
+  var gs = rows_('Guards'), g = null;
+  for (var i = 0; i < gs.length; i++) if (gs[i].ID === q.id) g = gs[i];
+  if (!g) return { ok: false, error: 'Guard not found' };
+  var upd = {};
+  if (q.shift === 'Day' || q.shift === 'Night') upd.RegularShift = q.shift;
+  if (q.agency === 'Sainik' || q.agency === 'Avenger') upd.Agency = q.agency;
+  if (q.post !== undefined) upd.RegularPost = String(q.post);
+  if (q.phone !== undefined) upd.Phone = String(q.phone).replace(/\D/g, '');
+  if (q.status === 'Left' || q.status === 'Active') upd.Status = q.status;
+  setCells_('Guards', g._row, upd);
+  addAlert_('guard', 'guard:' + g.ID + ':' + now_(), 'info', by + ' updated ' + g.Name + ': ' + Object.keys(upd).map(function (k) { return k + ' = ' + upd[k]; }).join(', '), 'head');
+  var ng = rows_('Guards').filter(function (x) { return x.ID === g.ID; })[0];
+  return { ok: true, guard: guardOut_(ng) };
 }
 
 function submitCheck_(q, by, role) {
@@ -217,7 +272,7 @@ function submitCheck_(q, by, role) {
   var post = String(q.post || '').trim();
   if (!post) return { ok: false, error: 'Choose a post' };
   var type = String(q.type || 'Regular');
-  var guard = null, flags = [], date = today_();
+  var guard = null, flags = [], date = today_(), t = now_();
   if (q.guardId) {
     var gs = rows_('Guards');
     for (var i = 0; i < gs.length; i++) if (gs[i].ID === q.guardId) guard = gs[i];
@@ -225,17 +280,40 @@ function submitCheck_(q, by, role) {
   } else if (presence !== 'Absent') {
     return { ok: false, error: 'Choose the guard, or mark the post Absent' };
   }
-  if (guard && presence !== 'Absent') {
-    var all = rows_('Checks'), cutoff = new Date().getTime() - 24 * 3600 * 1000, seen = false, myClass = dutyClass_(now_());
-    for (var k = 0; k < all.length; k++) {
-      var c = all[k];
-      if (c.GuardId !== guard.ID || c.Presence === 'Absent') continue;
-      seen = true;
-      var t = ts_(c.Time);
-      var cc = dutyClass_(c.Time);
-      if (t >= cutoff && isDouble_(c.Time, c.By, now_(), by)) flags.push('DOUBLE DUTY: ' + guard.Name + ' was also at ' + c.Post + ' (' + cc + ', ' + c.Date + ')');
+  var onPost = presence !== 'Absent';
+  if (role === 'supervisor' && onPost && !q.photo) return { ok: false, error: 'Take a photo at the post with the camera. It is required.' };
+  var all = rows_('Checks'), hash = '', lat = '', lng = '', acc = '';
+  /* 1. Is the photo fresh and unique? */
+  if (q.photo) {
+    var mm = /^data:image\/\w+;base64,(.+)$/.exec(q.photo);
+    if (mm) {
+      hash = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, Utilities.base64Decode(mm[1])).map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+      for (var h = all.length - 1; h >= 0 && h > all.length - 800; h--) {
+        if (all[h].Hash && all[h].Hash === hash) { flags.push('SAME PHOTO REUSED: this photo was already used at ' + all[h].Post + ' on ' + all[h].Date + '. Not a fresh photo.'); break; }
+      }
     }
-    if (!seen) flags.push('NEW GUARD: first time on record. Ask Sainik for his ID proof.');
+  }
+  /* 2. Was the supervisor physically at the gate? */
+  if (role === 'supervisor' && onPost) {
+    var la = Number(q.lat), lo = Number(q.lng);
+    if (q.lat === undefined || q.lat === '' || isNaN(la) || isNaN(lo)) {
+      flags.push('NO LOCATION: location was not shared, so presence at the gate cannot be confirmed.');
+    } else {
+      lat = la; lng = lo; acc = Math.round(Number(q.acc) || 0);
+      var pl = [], po = [];
+      all.forEach(function (c) { if (c.Post === post && c.Lat !== '' && c.Lng !== '' && c.Role === 'supervisor') { pl.push(Number(c.Lat)); po.push(Number(c.Lng)); } });
+      if (pl.length >= 3) {
+        var d = Math.round(distM_(la, lo, median_(pl), median_(po)));
+        if (d > 150) flags.push('LOCATION: scanned ' + d + ' m away from where ' + post + ' is usually checked.');
+      }
+    }
+  }
+  /* 3. Is the guard on his own shift? */
+  if (guard && onPost) {
+    var seen = all.some(function (c) { return c.GuardId === guard.ID && c.Presence !== 'Absent'; });
+    if (!seen) flags.push('NEW GUARD: first time on record. Ask his agency for his ID proof.');
+    if (guard.RegularShift && outsideShift_(guard.RegularShift, t)) flags.push(doubleDutyMsg_(guard, t));
+    else if (!guard.RegularShift) flags.push('SHIFT NOT SET: this guard has no registered shift yet. Control Room should set it.');
   }
   if (type === 'Temporary' || type === 'Permanent') {
     if (!String(q.related || '').trim()) return { ok: false, error: 'Write whom he is replacing' };
@@ -246,13 +324,18 @@ function submitCheck_(q, by, role) {
   if (type === 'Temporary') flags.push('Temporary replacement for ' + q.related);
   if (type === 'Permanent' && guard) {
     setCells_('Guards', guard._row, { RegularPost: post, RegularShift: shift });
-    flags.push('Permanent replacement for ' + q.related + '. Regular post updated.');
+    flags.push('Permanent replacement for ' + q.related + '. Regular post and shift updated.');
   }
   add_('Checks', {
-    Time: now_(), Date: date, Shift: shift, Post: post, GuardId: guard ? guard.ID : '', Guard: guard ? guard.Name : '',
+    Time: t, Date: date, Shift: shift, Post: post, GuardId: guard ? guard.ID : '', Guard: guard ? guard.Name : '',
     Presence: presence, Type: type, Related: q.related || '', Remark: String(q.remark || '').slice(0, 500),
-    PhotoId: photo_(q.photo, 'check'), By: by, Flags: flags.join(' | ')
+    PhotoId: photo_(q.photo, 'check'), By: by, Flags: flags.join(' | '), Role: role, Lat: lat, Lng: lng, Acc: acc, Hash: hash
   });
+  flags.forEach(function (f) {
+    var lvl = /^ABSENT/.test(f) ? 'high' : /^(DOUBLE|SAME PHOTO|NO LOCATION|LOCATION)/.test(f) ? 'medium' : '';
+    if (lvl) addAlert_('scan', 'scan:' + t + ':' + post + ':' + f.slice(0, 12), lvl, post + ' (' + shift + '), ' + by + ': ' + f, 'control,head');
+  });
+  try { alertTick_(); } catch (e) {}
   return { ok: true, flags: flags };
 }
 
@@ -265,6 +348,7 @@ function raiseIssue_(q, by, role) {
     Description: desc.slice(0, 800), PhotoId: photo_(q.photo, 'issue_' + id), RaisedBy: by, Status: 'Open', LastRemark: '', Updated: t, SolvedAt: ''
   });
   add_('Log', { Time: t, IssueID: id, By: by, Role: role, Action: 'Raised', Remark: desc.slice(0, 200) });
+  addAlert_('issue', 'issue:' + id, q.priority === 'Urgent' ? 'high' : 'medium', (q.priority === 'Urgent' ? 'URGENT ' : '') + 'Issue ' + id + ' at ' + (q.post || '') + ': ' + (q.category || 'Other') + ' (raised by ' + by + ')', 'control,head');
   return { ok: true, id: id };
 }
 
@@ -313,7 +397,86 @@ function listChecks_(from, to) {
   if (isNaN(span) || span < 0 || span > 62) return { ok: false, error: 'Choose a period of up to 62 days' };
   var rs = rows_('Checks').filter(function (c) { return c.Date >= from && c.Date <= to; }).map(function (c) {
     return { time: c.Time, date: c.Date, shift: c.Shift, post: c.Post, guardId: c.GuardId, guard: c.Guard, presence: c.Presence,
-      type: c.Type, related: c.Related, remark: c.Remark, photo: c.PhotoId, by: c.By, flags: c.Flags };
+      type: c.Type, related: c.Related, remark: c.Remark, photo: c.PhotoId, by: c.By, flags: c.Flags, role: c.Role, lat: c.Lat, lng: c.Lng, acc: c.Acc };
   });
   return { ok: true, from: from, to: to, checks: rs };
+}
+
+/* ================= Rounds and alerts ================= */
+/** Round windows (IST). A round is complete when at least min_cover of the gates were checked by that role inside the window. */
+var ROUNDS = [
+  { id: 'S1', role: 'supervisor', name: 'Morning round', from: '09:30', to: '11:30' },
+  { id: 'S2', role: 'supervisor', name: 'Midday round', from: '12:30', to: '14:30' },
+  { id: 'S3', role: 'supervisor', name: 'Afternoon round', from: '15:30', to: '17:30' },
+  { id: 'S4', role: 'supervisor', name: 'Evening handover round', from: '19:00', to: '20:45' },
+  { id: 'C1', role: 'control', name: 'Night camera round 1', from: '21:30', to: '23:30' },
+  { id: 'C2', role: 'control', name: 'Night camera round 2', from: '01:00', to: '03:00' },
+  { id: 'C3', role: 'control', name: 'Night camera round 3', from: '04:30', to: '06:30' },
+  { id: 'C4', role: 'control', name: 'Morning handover round', from: '07:30', to: '09:30' }
+];
+function requiredPosts_() { return rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; }); }
+function dateAdd_(d, n) { var x = new Date(d + 'T12:00:00+05:30'); x.setDate(x.getDate() + n); return Utilities.formatDate(x, TZ, 'yyyy-MM-dd'); }
+/** Status of every round window on the given dates, newest first. */
+function roundList_(dates, checks, rm) {
+  var firstT = Infinity; rows_('Checks').forEach(function (c) { var x = ts_(c.Time); if (x < firstT) firstT = x; });
+  var minCover = Number(settings_().min_cover) || 0.9, req = requiredPosts_(), now = new Date().getTime(), out = [];
+  dates.forEach(function (d) {
+    ROUNDS.forEach(function (R) {
+      var st = ts_(d + ' ' + R.from + ':00'), en = ts_(d + ' ' + R.to + ':00'), posts = {};
+      if (en < firstT) return;
+      checks.forEach(function (c) {
+        if ((c.Role || roleOfName_(c.By, rm)) !== R.role) return;
+        var t = ts_(c.Time); if (t >= st && t <= en) posts[c.Post] = 1;
+      });
+      var got = req.filter(function (p) { return posts[p]; }), status = now < st ? 'upcoming' : now <= en ? 'open' : (got.length >= Math.ceil(req.length * minCover) ? 'done' : 'missed');
+      out.push({ id: R.id, role: R.role, name: R.name, date: d, from: R.from, to: R.to, status: status, done: got.length, total: req.length,
+        missing: req.filter(function (p) { return !posts[p]; }), start: st });
+    });
+  });
+  out.sort(function (a, b) { return b.start - a.start; });
+  out.forEach(function (r) { delete r.start; });
+  return out;
+}
+function roundsOut_(role, q) {
+  var days = Math.min(Math.max(Number(q && q.days) || 1, 1), 31), dates = [], today = today_();
+  for (var i = 0; i < days; i++) dates.push(dateAdd_(today, -i));
+  var from = dateAdd_(today, -days), checks = rows_('Checks').filter(function (c) { return c.Date >= from; });
+  var list = roundList_(dates, checks, roleMap_());
+  if (role !== 'head') list = list.filter(function (r) { return r.role === role; });
+  return { ok: true, rounds: list, minCover: Number(settings_().min_cover) || 0.9 };
+}
+
+function addAlert_(type, key, level, msg, aud) {
+  var sh = ss_().getSheetByName('Alerts'); if (!sh) return false;
+  var last = sh.getLastRow(), from = Math.max(2, last - 400);
+  if (last >= 2 && sh.getRange(from, 3, last - from + 1, 1).getValues().some(function (r) { return String(r[0]) === key; })) return false;
+  add_('Alerts', { Time: now_(), Type: type, Key: key, Level: level, Message: msg, Audience: aud });
+  return true;
+}
+/** Looks for problems nobody has reported: missed rounds, unacknowledged and overdue issues. Runs at most every 4 minutes, whenever the app is used. */
+function alertTick_() {
+  var st = settings_(), nowT = new Date().getTime();
+  if (st.last_tick && nowT - Number(st.last_tick) < 4 * 60000) return;
+  setSetting_('last_tick', String(nowT));
+  var today = today_(), rm = roleMap_(), from = dateAdd_(today, -2);
+  var list = roundList_([today, dateAdd_(today, -1)], rows_('Checks').filter(function (c) { return c.Date >= from; }), rm);
+  list.forEach(function (r) {
+    if (r.status !== 'missed' || nowT - ts_(r.date + ' ' + r.to + ':00') > 6 * 3600000) return;
+    addAlert_('round', 'round:' + r.id + ':' + r.date, 'high', 'Missed round: ' + r.name + ' (' + (r.role === 'control' ? 'Control Room' : 'Supervisor') + '), ' + r.date + ' ' + r.from + ' to ' + r.to + '. Only ' + r.done + ' of ' + r.total + ' gates checked. Not checked: ' + r.missing.slice(0, 6).join(', ') + (r.missing.length > 6 ? '…' : ''), 'control,head');
+  });
+  var od = Number(st.overdue_hours) || 24;
+  rows_('Issues').forEach(function (i) {
+    if (i.Status === 'Solved') return;
+    var ageH = (nowT - ts_(i.Created)) / 36e5;
+    if (i.Status === 'Open' && i.Category !== PRIVATE_CAT && ageH >= 0.5) addAlert_('issue', 'unack:' + i.ID, 'high', 'Nobody has acknowledged ' + i.ID + ' (' + i.Post + ', ' + i.Category + ') for ' + Math.round(ageH * 60) + ' minutes.', 'control,head');
+    if (ageH >= od) addAlert_('issue', 'overdue:' + i.ID + ':' + today, 'high', i.ID + ' (' + i.Post + ', ' + i.Category + ') is still unsolved after ' + Math.round(ageH) + ' hours.', 'control,head');
+  });
+}
+function alertsOut_(role) {
+  try { alertTick_(); } catch (e) {}
+  if (role === 'supervisor') return { ok: true, alerts: [] };
+  var out = rows_('Alerts').filter(function (a) { return String(a.Audience).split(',').indexOf(role) > -1; }).map(function (a) {
+    return { time: a.Time, type: a.Type, level: a.Level, message: a.Message };
+  }).reverse().slice(0, 60);
+  return { ok: true, alerts: out };
 }
