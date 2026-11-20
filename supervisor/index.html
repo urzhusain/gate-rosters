@@ -372,7 +372,9 @@ function viewAgency(){
   Promise.all([call('bootstrap'),call('checks',{from:r0[0],to:ymd(0)>r0[1]?r0[1]:ymd(0)})]).then(function(rs){
     if(!rs[1].ok){$('#ar').innerHTML='<span class="err">'+esc(rs[1].error)+'</span>';return}
     if(rs[0].ok)S.guards=rs[0].guards;
-    var days=dDays(r0[0],end),EX=(window.SUP_CONFIG||{}).expected||{},CFG=(window.SUP_CONFIG||{}).agencies||{},gm={};S.guards.forEach(function(g){gm[g.id]=g});
+    var minD=rs[1].checks.reduce(function(a,c){return !a||c.date<a?c.date:a},''),st0=(minD&&minD>r0[0])?minD:r0[0];
+    if(st0>end){$('#ar').textContent='Scanning started on '+dShort(st0)+'. The report is available from tomorrow.';return}
+    var days=dDays(st0,end),EX=(window.SUP_CONFIG||{}).expected||{},CFG=(window.SUP_CONFIG||{}).agencies||{},gm={};S.guards.forEach(function(g){gm[g.id]=g});
     var credit={},absent={},seenDays={},seenPost={};
     rs[1].checks.forEach(function(c){
       var g=gm[c.guardId],sh=(g&&g.shift)||c.shift,d=c.date,x=(String(c.time).match(/(\d+):(\d+)/)||[0,0,0]);
@@ -397,13 +399,13 @@ function viewAgency(){
       var gl=(S.guards||[]).filter(function(g){return (g.agency||'Sainik')===A&&g.status!=='Left'}).map(function(g){return {g:g,n:Object.keys(seenDays[g.id]||{}).length,posts:Object.keys(seenPost[g.id]||{})}}).sort(function(a,b){return b.n-a.n});
       wa[A]={cfg:cfg,key:key,txt:'Aljamea-tus-Saifiyah security: duty check, '+cfg.name+'\n'+dShort(r0[0])+' to '+dShort(end)+'\nDuties due: '+T.due+'\nVerified present: '+T.ver+' ('+pct+'%)\nMarked absent: '+T.abs+(absList.length?' ('+absList.slice(0,8).join(', ')+(absList.length>8?'…':'')+')':'')+'\nNot verified (no scan): '+T.nv+'\nPlease check and confirm.\n- Siyanat, Aljamea'};
       out+='<div class="card" style="gap:8px"><div class="row" style="justify-content:space-between"><b style="font-size:18px">'+esc(cfg.name)+'</b><span class="chip '+(pct>=90?'grn':pct>=60?'yel':'red')+'">'+pct+'% verified</span></div>'+
-        '<div class="muted">'+T.ver+' of '+T.due+' contracted duties were seen present by a scan · '+T.abs+' marked absent · '+T.nv+' not verified</div>'+
+        '<div class="muted">'+dShort(st0)+' to '+dShort(end)+': '+T.ver+' of '+T.due+' contracted duties were seen present by a scan · '+T.abs+' marked absent · '+T.nv+' not verified</div>'+
         '<div class="scr"><table><tr><th>Gate</th><th>Shift</th><th>Per day</th><th>Due</th><th>Seen</th><th>Absent</th><th>No scan</th></tr>'+rows.map(function(r){return '<tr><td>'+esc(r.p)+'</td><td>'+r.sh+'</td><td>'+r.exp+'</td><td>'+r.due+'</td><td>'+r.ver+'</td><td>'+(r.ab?'<span class="chip red">'+r.ab+'</span>':'0')+'</td><td>'+r.nv+'</td></tr>'}).join('')+'<tr><td><b>Total</b></td><td></td><td></td><td><b>'+T.due+'</b></td><td><b>'+T.ver+'</b></td><td><b>'+T.abs+'</b></td><td><b>'+T.nv+'</b></td></tr></table></div>'+
         (rows.some(function(r){return r.ex})?'<div class="flag info">More guards than the contract were seen at: '+rows.filter(function(r){return r.ex}).map(function(r){return esc(r.p)+' '+r.sh+' ('+r.ex+' days)'}).join(', ')+'. Check whether these are extra guards you are billed for, or not in the contract.</div>':'')+
         '<details><summary class="muted" style="cursor:pointer">Guards of this agency ('+gl.length+')</summary><div class="scr"><table><tr><th>Guard</th><th>Shift</th><th>Days seen</th><th>Posts</th></tr>'+gl.map(function(x){return '<tr><td>'+esc(x.g.name)+'</td><td>'+esc(x.g.shift||'?')+'</td><td>'+x.n+'</td><td>'+esc(x.posts.join(', '))+'</td></tr>'}).join('')+'</table></div></details>'+
         '<div class="row"><button class="btn o s" data-csv="'+A+'">Download CSV</button><button class="btn g s" data-wa="'+A+'">Send summary on WhatsApp</button></div></div>'});
     $('#ar').outerHTML='<div id="ar" style="display:flex;flex-direction:column;gap:12px">'+(out||'<div class="muted">Nothing to report. Set the contracted guards per gate in config.js.</div>')+
-      '<div class="flag info" style="margin:0"><b>How to read this.</b> A duty is "seen" only when a Supervisor or Control Room scan found a guard of that agency present at that gate and shift. "No scan" is not the same as absent: nobody scanned that gate in that shift. Contracted guards per gate come from the October invoices and can be changed in config.js. Scanning began on 19 Nov, so earlier days will show as not verified.</div></div>';
+      '<div class="flag info" style="margin:0"><b>How to read this.</b> A duty is "seen" only when a Supervisor or Control Room scan found a guard of that agency present at that gate and shift. "No scan" is not the same as absent: nobody scanned that gate in that shift. Contracted guards per gate come from the October invoices and can be changed in config.js. Counted from the first day of scanning ('+dShort(st0)+').</div></div>';
     [].forEach.call(document.querySelectorAll('[data-csv]'),function(b){b.onclick=function(){csvDownload('agency-check-'+b.dataset.csv+'-'+r0[0].slice(0,7)+'.csv',csv.filter(function(r,i){return i===0||r[0]===b.dataset.csv}))}});
     [].forEach.call(document.querySelectorAll('[data-wa]'),function(b){b.onclick=function(){var w=wa[b.dataset.wa],n=((w.cfg.whatsapp)||'').replace(/\D/g,'');window.open('https://wa.me/'+(n.length===10?'91'+n:n)+'?text='+encodeURIComponent(w.txt),'_blank')}});
   })}
