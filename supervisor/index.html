@@ -334,6 +334,32 @@ function editGuard(id,done){
       if(!r.ok){$('#ee',d).textContent=r.error;return}
       S.guards=S.guards.map(function(x){return x.id===id?r.guard:x});d.remove();toast('Saved');if(done)done()})}
 }
+function guardRecord(id){
+  var g=gInfo(id);
+  var d=modal('<h2>'+esc(g.name)+' <span class="muted" style="font-size:14px">'+esc(g.id)+'</span></h2><div id="gr" class="muted">Loading 60 days…</div><button class="btn o" id="grc">Close</button>');
+  $('#grc',d).onclick=function(){d.remove()};
+  call('checks',{from:ymd(-59),to:ymd(0)}).then(function(r){
+    var box=$('#gr',d);if(!r.ok){box.innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
+    var mine=r.checks.filter(function(c){return c.guardId===id}).sort(function(a,b){return (b.date+b.time).localeCompare(a.date+a.time)});
+    var days={},pres={Present:0,Late:0,Absent:0},posts={},fl={},first=null;
+    mine.forEach(function(c){days[c.date]=(days[c.date]||0)+1;pres[c.presence]=(pres[c.presence]||0)+1;if(c.post)posts[c.post]=(posts[c.post]||0)+1;
+      (String(c.flags||'').match(/DOUBLE DUTY|SAME PHOTO|NO LOCATION|LOCATION|SHIFT NOT SET|NEW GUARD/g)||[]).forEach(function(k){fl[k]=(fl[k]||0)+1});
+      if(!first||c.date<first)first=c.date});
+    var nd=Object.keys(days).length,tot=pres.Present+pres.Late+pres.Absent;
+    var strip='';for(var i=59;i>=0;i--){var dt=ymd(-i);strip+='<span title="'+dt+'" style="display:inline-block;width:9px;height:18px;margin:0 1px 1px 0;border-radius:2px;background:'+(days[dt]?'var(--grn,#2e7d32)':'var(--line,#ddd)')+'"></span>'}
+    var late=pres.Late?Math.round(100*pres.Late/Math.max(1,pres.Present+pres.Late)):0;
+    var pl=Object.keys(posts).sort(function(a,b){return posts[b]-posts[a]}).map(function(k){return esc(k)+' ('+posts[k]+')'}).join(', ')||'—';
+    var fk=Object.keys(fl).map(function(k){return '<span class="chip red">'+fl[k]+' '+esc(k.toLowerCase())+'</span>'}).join(' ')||'<span class="chip grn">No flags</span>';
+    box.className='';
+    box.innerHTML='<div style="margin-bottom:8px"><span class="chip">'+esc(g.shift||'No shift')+'</span> <span class="chip">'+esc(g.agency||'Sainik')+'</span> <span class="chip">'+esc(g.post||'No usual post')+'</span></div>'+
+      '<div class="muted" style="font-size:13px;margin-bottom:4px">Last 60 days · green = seen by a scan</div><div style="margin-bottom:10px">'+strip+'</div>'+
+      '<div style="font-size:15px;line-height:1.7"><b>'+nd+'</b> days seen'+(first?' since '+esc(first.slice(5)):'')+' · <b>'+pres.Present+'</b> present · <b>'+pres.Late+'</b> late ('+late+'%) · <b>'+pres.Absent+'</b> absent<br>'+
+      'Flags: '+fk+'<br><span class="muted" style="font-size:13px">Posts: '+pl+'</span></div>'+
+      '<h3 style="margin:14px 0 6px">Recent scans</h3>'+(mine.slice(0,15).map(function(c){return '<div style="font-size:13px;border-top:1px solid var(--line,#ddd);padding:5px 0"><b>'+esc(c.date.slice(5))+'</b> '+esc(String(c.time).slice(-8,-3)||'')+' · '+esc(c.post)+' · '+esc(c.presence)+' <span class="muted">('+esc(c.role==='control'?'Control Room':'Supervisor')+')</span>'+(c.flags?'<div class="err" style="font-size:12px">'+esc(c.flags)+'</div>':'')+'</div>'}).join('')||'<div class="muted">No scans in 60 days.</div>')+
+      '<div style="margin-top:10px"><button class="btn o s" id="grx">Download CSV</button></div>';
+    $('#grx',d).onclick=function(){csvDownload('guard-'+g.id+'.csv',[['Date','Time','Post','Shift','Presence','Scanned by','Flags']].concat(mine.map(function(c){return [c.date,c.time,c.post,c.shift,c.presence,c.role,c.flags]})))};
+  });
+}
 function viewGuards(){
   var m=$('#mn');m.innerHTML='<button class="btn o s" data-tab-go="home">← Home</button><h2>Guards</h2><div class="f"><input id="gq" placeholder="Search name or number"></div><div id="gl" class="muted">Loading…</div>';goBtns(m);
   call('bootstrap').then(function(b){if(b.ok&&b.guards)S.guards=b.guards;return call('checks',{from:ymd(-29),to:ymd(0)})}).then(function(r){
@@ -348,8 +374,8 @@ function viewGuards(){
         return '<div class="card" style="flex-direction:row;gap:12px;align-items:flex-start;margin-bottom:10px">'+(miniPh(g.photo,72)||'<div style="width:72px;height:72px;border-radius:8px;background:var(--line)"></div>')+
           '<div style="flex:1;min-width:0"><b>'+esc(g.name)+'</b> <span class="muted">'+esc(g.id)+'</span> '+(g.shift?'<span class="chip">'+esc(g.shift)+'</span>':'<span class="chip red">No shift</span>')+' <span class="chip">'+esc(g.agency||'Sainik')+'</span><div style="font-size:14px">'+phoneLinks(g.phone)+'</div>'+
           '<div class="muted" style="font-size:13px">'+(c?'Last seen: '+esc(c.post)+' · '+esc(c.shift)+' · '+esc(c.date.slice(5))+' ('+esc(c.presence)+')':'Not seen in the last 30 days')+'</div>'+
-          '<div class="muted" style="font-size:13px">'+(cnt[g.id]||0)+' shifts in 30 days'+(bad[g.id]?' · <span class="chip red">'+bad[g.id]+' double-duty</span>':'')+'</div>'+(S.role!=='supervisor'?'<button class="btn o s" data-eg="'+esc(g.id)+'" style="margin-top:6px">Edit shift / agency</button>':'')+'</div></div>'}).join(''):'<div class="muted">No guards found.</div>'}
-    function bindEdit(){[].forEach.call(document.querySelectorAll('[data-eg]'),function(b){b.onclick=function(){editGuard(b.dataset.eg,function(){draw($('#gq').value)})}})}
+          '<div class="muted" style="font-size:13px">'+(cnt[g.id]||0)+' shifts in 30 days'+(bad[g.id]?' · <span class="chip red">'+bad[g.id]+' double-duty</span>':'')+'</div>'+(S.role!=='supervisor'?'<button class="btn o s" data-rg="'+esc(g.id)+'" style="margin-top:6px;margin-right:6px">Record</button><button class="btn o s" data-eg="'+esc(g.id)+'" style="margin-top:6px">Edit shift / agency</button>':'')+'</div></div>'}).join(''):'<div class="muted">No guards found.</div>'}
+    function bindEdit(){[].forEach.call(document.querySelectorAll('[data-rg]'),function(b){b.onclick=function(){guardRecord(b.dataset.rg)}});[].forEach.call(document.querySelectorAll('[data-eg]'),function(b){b.onclick=function(){editGuard(b.dataset.eg,function(){draw($('#gq').value)})}})}
     var _draw=draw;draw=function(q){_draw(q);bindEdit()};
     draw('');$('#gq').oninput=function(){draw(this.value)};
   });
