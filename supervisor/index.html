@@ -109,9 +109,10 @@ function gx(c){var g=gInfo(c.guardId);return '<div style="display:flex;gap:8px;a
 function full(id){return 'https://drive.google.com/file/d/'+encodeURIComponent(id)+'/view'}
 function compress(file){return new Promise(function(res){
   if(!file)return res('');
-  var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){
-    var m=1000,s=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
-    c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.68))};im.onerror=function(){res('')};im.src=r.result};r.onerror=function(){res('')};r.readAsDataURL(file)})}
+  var u=URL.createObjectURL(file),im=new Image();
+  im.onload=function(){try{var m=1000,s=Math.min(1,m/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);var o=c.toDataURL('image/jpeg',0.68);URL.revokeObjectURL(u);res(o)}catch(e){res('')}};
+  im.onerror=function(){URL.revokeObjectURL(u);res('')};im.src=u})}
 
 /* ---------- login ---------- */
 function viewLogin(msg){
@@ -124,11 +125,11 @@ function viewLogin(msg){
     S.pin=p;$('#lg').disabled=true;$('#lg').textContent='Checking…';
     call('bootstrap').then(function(r){
       if(!r.ok){S.pin='';viewLogin(r.error);return}
-      store('pin',p);S.name=r.name;S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;
-      S.shift=defShift();S.tab='home';S.filter=r.role==='head'?'overdue':'open';
+      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;
+      S.shift=defShift();S.tab=store('draft_raise')?'raise':'home';S.filter=r.role==='head'?'overdue':'open';
       main()})};
 }
-function logout(){S.pin='';S.role='';store('pin','');viewLogin()}
+function logout(){S.pin='';S.role='';store('pin','');store('name','');viewLogin()}
 
 /* ---------- shell ---------- */
 function tabsFor(){
@@ -226,7 +227,7 @@ function openCheck(post){
 
 /* ---------- raise ---------- */
 function viewRaise(){
-  var pf=S.prefill||{};S.prefill=null;
+  var pf=S.prefill||{};S.prefill=null;if(!pf.description&&!pf.post){try{pf=JSON.parse(store('draft_raise')||'{}')||{}}catch(e){pf={}}}
   var cam=S.role==='control';if(cam&&!pf.category)pf.category='Suspicious activity (seen on camera)';
   $('#mn').innerHTML='<h2>'+(cam?'Report from cameras':'Raise an issue')+'</h2><div class="card">'+
   '<div class="f"><label>Where?</label><select id="rp">'+S.posts.concat(['Other / whole campus']).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
@@ -236,15 +237,18 @@ function viewRaise(){
   '<div class="f"><label>Details</label><textarea id="rd">'+esc(pf.description||'')+'</textarea></div>'+
   '<div class="f"><label>Photo or screenshot</label><input id="rf" type="file" accept="image/*"'+(cam?'':' capture="environment"')+'></div><div class="err" id="re"></div>'+
   '<button class="btn" id="rs">'+(cam?'Save report':'Send to Control Room')+'</button></div>';
-  var urg='Normal';
-  [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.onclick=function(){urg=b.dataset.u;[].forEach.call(document.querySelectorAll('[data-u]'),function(x){x.setAttribute('aria-pressed',x===b)})}});
+  var urg=pf.urg==='Urgent'?'Urgent':'Normal';
+  [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.setAttribute('aria-pressed',b.dataset.u===urg)});
+  function saveDraft(){store('draft_raise',JSON.stringify({post:$('#rp').value,category:$('#rc').value,urg:urg,description:$('#rd').value}))}
+  ['#rp','#rc','#rd'].forEach(function(q){$(q).addEventListener('input',saveDraft);$(q).addEventListener('change',saveDraft)});
+  [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.onclick=function(){urg=b.dataset.u;[].forEach.call(document.querySelectorAll('[data-u]'),function(x){x.setAttribute('aria-pressed',x===b)});saveDraft()}});
   function fullDesc(){var d=$('#rd').value.trim();if(!cam)return d;var c=($('#rcam')&&$('#rcam').value.trim())||'';return (c?'('+c+') ':'')+d}
   $('#rs').onclick=function(){
     var b=this;b.disabled=true;b.textContent='Sending…';
     compress($('#rf').files[0]).then(function(img){window._ri=img;return call('raiseIssue',{post:$('#rp').value,category:$('#rc').value,priority:urg,description:fullDesc(),photo:img})}).then(function(r){
       b.disabled=false;b.textContent=cam?'Save report':'Send to Control Room';
       if(!r.ok){$('#re').textContent=r.error;return}
-      S.issues=null;
+      S.issues=null;store('draft_raise','');
       if(cam){toast('Report '+r.id+' saved');S.tab='issues';S.filter='open';main();return}
       var CR=((window.SUP_CONFIG||{}).controlWhatsapp||'').replace(/\D/g,'');
       var msg=(urg==='Urgent'?'URGENT - ':'')+'Issue '+r.id+'\n'+$('#rp').value+' - '+$('#rc').value+'\n'+($('#rd').value||'(no details)')+'\nRaised by '+S.name+(window._ri?'\n(photo is in the app)':'');
