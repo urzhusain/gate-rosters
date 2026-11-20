@@ -536,11 +536,11 @@ function heatmap(days,posts,map){
   return '<div class="scr"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:'+Math.min(W,560)+'px" role="img" aria-label="Rounds completed by gate and day">'+s+'</svg></div>'+
    '<div class="lg"><span><i style="background:var(--c1)"></i>Checked</span><span><i style="background:var(--c4)"></i>Late guard</span><span><i style="background:var(--bad)"></i>Absent found</span><span><i style="background:var(--line)"></i>Not checked</span><span class="muted">Top row Day, bottom row Night</span></div>'}
 function roundMatrix(list,days){
-  var ids=['S1','S2','S3','S4','C1','C2','C3','C4'],by={};list.forEach(function(r){by[r.date+'|'+r.id]=r});
+  var ids=['S1','S2','S3','S4','C4'],by={};list.forEach(function(r){by[r.date+'|'+r.id]=r});
   var cell=function(r){if(!r)return '<td></td>';var c=r.status==='done'?'var(--ok)':r.status==='missed'?'var(--bad)':r.status==='open'?'var(--c4)':'var(--line)',tx=r.status==='done'?'✓':r.status==='missed'?'✗':r.status==='open'?'…':'·';
     return '<td style="text-align:center"><span title="'+esc(r.name+' · '+r.date+' · '+r.done+' of '+r.total+' gates ('+r.status+')')+'" style="display:inline-block;min-width:26px;padding:2px 0;border-radius:6px;background:'+c+';color:'+(r.status==='upcoming'?'var(--mute)':'#fff')+';font-weight:800">'+tx+'</span></td>'};
   var rows=days.slice().reverse().filter(function(d){return ids.some(function(i){return by[d+'|'+i]})}).slice(0,14).map(function(d){return '<tr><td>'+dShort(d)+'</td>'+ids.map(function(i){return cell(by[d+'|'+i])}).join('')+'</tr>'}).join('');
-  return '<div class="scr"><table><tr><th>Day</th>'+ids.map(function(i){return '<th style="text-align:center">'+i+'</th>'}).join('')+'</tr>'+rows+'</table></div><div class="lg"><span><i style="background:var(--ok)"></i>Done</span><span><i style="background:var(--bad)"></i>Missed</span><span><i style="background:var(--c4)"></i>Open now</span><span class="muted">S1 9:30, S2 12:30, S3 3:30 PM, S4 7 PM · C1 9:30 PM, C2 1 AM, C3 4:30 AM, C4 7:30 AM</span></div>'}
+  return '<div class="scr"><table><tr><th>Day</th>'+ids.map(function(i){return '<th style="text-align:center">'+i+'</th>'}).join('')+'</tr>'+rows+'</table></div><div class="lg"><span><i style="background:var(--ok)"></i>Done</span><span><i style="background:var(--bad)"></i>Missed</span><span><i style="background:var(--c4)"></i>Open now</span><span class="muted">S1 9:30 AM, S2 12:30, S3 3:30 PM, S4 7:30 PM · C4 6:30 AM</span></div>'}
 function viewHeadDash(){
   var m=$('#mn');m.classList.add('wide');var p=S.dp||'30',rg=dRange(p);
   m.innerHTML=DASH_CSS+'<div class="dh"><h2>Head Office dashboard</h2><div class="seg" id="dps"><button data-p="7"'+(p==='7'?' aria-pressed="true"':'')+'>7 days</button><button data-p="30"'+(p==='30'?' aria-pressed="true"':'')+'>30 days</button><button data-p="month"'+(p==='month'?' aria-pressed="true"':'')+'>This month</button></div></div><div id="hm" class="muted">Loading…</div>';
@@ -580,7 +580,7 @@ function viewHeadDash(){
       kpi('Guards seen',Object.keys(cs.reduce(function(o,c){if(c.guardId)o[c.guardId]=1;return o},{})).length,'different guards in rounds')+
     '</div><div class="dg" style="margin-top:12px">'+
       '<div class="w2">'+alertsCard(AL,5)+'</div>'+
-      '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. Supervisor S1 to S4, Control Room C1 to C4.</div>'+roundMatrix(RL,days)+'</div>'+
+      '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. Supervisor S1 to S4 (S4 is the evening round of the night watchmen), Control Room C4 (the morning round of the night watchmen).</div>'+roundMatrix(RL,days)+'</div>'+
       '<div class="card w2"><div class="ct">Issues raised vs resolved, per day</div><div class="lg"><span><i style="background:var(--c1)"></i>Raised</span><span><i style="background:var(--c2)"></i>Resolved</span></div>'+dailyChart(days,perDayR,perDayS)+tbl+'</div>'+
       '<div class="card"><div class="ct">Issues by category</div><div class="cs">Raised in this period</div>'+hbars(catI,'var(--c1)')+'</div>'+
       '<div class="card"><div class="ct">Issues by gate</div><div class="cs">Raised in this period, with how many are still open</div>'+hbars(gateI,'var(--c1)')+'</div>'+

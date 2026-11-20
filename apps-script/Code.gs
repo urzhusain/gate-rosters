@@ -408,11 +408,8 @@ var ROUNDS = [
   { id: 'S1', role: 'supervisor', name: 'Morning round', from: '09:30', to: '11:30' },
   { id: 'S2', role: 'supervisor', name: 'Midday round', from: '12:30', to: '14:30' },
   { id: 'S3', role: 'supervisor', name: 'Afternoon round', from: '15:30', to: '17:30' },
-  { id: 'S4', role: 'supervisor', name: 'Evening handover round', from: '19:00', to: '20:45' },
-  { id: 'C1', role: 'control', name: 'Night camera round 1', from: '21:30', to: '23:30' },
-  { id: 'C2', role: 'control', name: 'Night camera round 2', from: '01:00', to: '03:00' },
-  { id: 'C3', role: 'control', name: 'Night camera round 3', from: '04:30', to: '06:30' },
-  { id: 'C4', role: 'control', name: 'Morning handover round', from: '07:30', to: '09:30' }
+  { id: 'S4', role: 'supervisor', name: 'Night watchmen round (evening)', from: '19:30', to: '21:00' },
+  { id: 'C4', role: 'control', name: 'Night watchmen round (morning)', from: '06:30', to: '08:00' }
 ];
 function requiredPosts_() { return rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; }); }
 function dateAdd_(d, n) { var x = new Date(d + 'T12:00:00+05:30'); x.setDate(x.getDate() + n); return Utilities.formatDate(x, TZ, 'yyyy-MM-dd'); }
