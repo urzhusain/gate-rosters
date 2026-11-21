@@ -479,9 +479,8 @@ var CHECKPOINTS = [
   { id: 'R1', post: 'Gate 1', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
   { id: 'R2', post: 'Gate 4', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
   { id: 'R3', post: 'Gate 8 & 9', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
-  { id: 'O1', post: 'Gate 1', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' },
-  { id: 'O2', post: 'Gate 4', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' },
-  { id: 'O3', post: 'Gate 8 & 9', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' }
+  { id: 'M1', post: 'Gate 8 & 9', name: 'Incoming material vs bill', type: 'check', from: '09:00', to: '19:00', hint: 'Take the latest incoming entry. Check the goods against the bill. Does the guard\'s tally match?' },
+  { id: 'M2', post: 'Gate 8 & 9', name: 'Outgoing material vs gate pass', type: 'check', from: '09:00', to: '19:00', hint: 'Take the latest outgoing entry. Check the goods against the gate pass. Does the guard\'s tally match?' }
 ];
 function cpSheet_() {
   var ss = ss_(), sh = ss.getSheetByName('Checkpoints');
@@ -503,7 +502,7 @@ function cpList_(dates, recs) {
       var rec = mine.length ? mine[mine.length - 1] : null, status;
       if (rec) status = rec.Result === 'Problem' ? 'problem' : (ts_(rec.Time) > en ? 'late' : 'done');
       else status = now < st ? 'upcoming' : now <= en ? 'open' : 'missed';
-      out.push({ id: C.id, by_role: C.by || '', post: C.post, name: C.name, type: C.type, date: d, from: C.from, to: C.to, status: status,
+      out.push({ id: C.id, hint: C.hint || '', by_role: C.by || '', post: C.post, name: C.name, type: C.type, date: d, from: C.from, to: C.to, status: status,
         by: rec ? rec.By : '', time: rec ? rec.Time : '', result: rec ? rec.Result : '', remark: rec ? rec.Remark : '', photo: rec ? rec.PhotoId : '' });
     });
   });
