@@ -767,11 +767,11 @@ function cpChip(c){var m={done:['grn','Done'],late:['grn','Done (late)'],problem
 function cpRow(c,btn){var hm=function(t){return String(t).slice(11,16)};
   return '<div style="border-top:1px solid var(--line);padding:9px 0"><div class="row" style="justify-content:space-between;align-items:flex-start"><span><b>'+esc(c.name)+'</b><br><small class="muted">'+esc(c.post)+' · '+esc(c.from)+' to '+esc(c.to)+'</small></span>'+cpChip(c)+'</div>'+
     (c.time?'<small class="muted">'+(c.result==='Problem'?'<b style="color:var(--red)">Problem:</b> '+esc(c.remark)+' · ':c.type==='check'?'Matched · ':'')+'by '+esc(c.by)+' at '+hm(c.time)+(c.photo?' · <a href="'+full(c.photo)+'" target="_blank" rel="noopener">Photo</a>':'')+'</small>':'')+
-    (btn&&(c.status==='open'||c.status==='missed')?'<div style="margin-top:6px"><button class="btn s" data-cpc="'+esc(c.id)+'">'+(c.type==='check'?'Record spot check':'Confirm')+'</button></div>':'')+'</div>'}
+    (btn&&(!c.by_role||c.by_role===S.role)&&(c.status==='open'||c.status==='missed')?'<div style="margin-top:6px"><button class="btn s" data-cpc="'+esc(c.id)+'">'+(c.type==='check'?'Record spot check':'Confirm')+'</button></div>':'')+'</div>'}
 function cpCard(list){var t=ymd(0),y=ymd(-1),td=list.filter(function(c){return c.date===t}),ym=list.filter(function(c){return c.date===y&&(c.status==='missed'||c.status==='problem')});
   return '<div class="card w2"><div class="ct">Checkpoints today</div><div class="cs">Timed duties: gate closing, register photos, outgoing material spot checks</div>'+(td.length?td.map(function(c){return cpRow(c,false)}).join(''):'<div class="muted">None.</div>')+
     (ym.length?'<div class="ct" style="margin-top:8px;font-size:14px">Missed or problem yesterday</div>'+ym.map(function(c){return cpRow(c,false)}).join(''):'')+'</div>'}
-function cpDue(list){var t=ymd(0);return list.filter(function(c){return c.date===t&&(c.status==='open'||c.status==='missed')})}
+function cpDue(list){var t=ymd(0);return list.filter(function(c){return c.date===t&&(!c.by_role||c.by_role===S.role)&&(c.status==='open'||c.status==='missed')})}
 function openCheckpoints(done){
   var d=modal('<h2>Checkpoints</h2><div id="cpb" class="muted">Loading…</div><button class="btn o" id="cpx">Close</button>');
   $('#cpx',d).onclick=function(){d.remove();if(done)done()};
@@ -781,7 +781,7 @@ function openCheckpoints(done){
     [].forEach.call(d.querySelectorAll('[data-cpc]'),function(b){b.onclick=function(){var c=l.filter(function(x){return x.id===b.dataset.cpc})[0];d.remove();confirmCp(c,done)}})})}
 function confirmCp(c,done){
   var photo=c.type==='photo',d=modal('<h2>'+esc(c.name)+'</h2><div class="muted">'+esc(c.post)+'</div>'+
-    (photo?'<div class="f"><label>'+(c.id[0]==='R'?'Photo of the register page(s) for today':'Photo of the gate, closed')+(S.role==='supervisor'?' (required)':'')+'</label><input id="cpf" type="file" accept="image/*" capture="environment"></div>'
+    (photo?'<div class="f"><label>'+(c.id[0]==='R'?'Photo of the register page(s) for today':'Photo or camera screenshot of the gate, closed')+(S.role==='supervisor'?' (required)':' (optional)')+'</label><input id="cpf" type="file" accept="image/*" capture="environment"></div>'
       :'<div class="f"><label>Open the outgoing register, take the latest entry and check the goods physically. Does it match?</label><select id="cpr"><option value="Matches">Matches</option><option value="Problem">Problem</option></select></div>')+
     '<div class="f"><label>'+(photo?'Remark (optional)':'Remark (required if Problem)')+'</label><input id="cpm"></div><div class="err" id="cpe"></div><button class="btn" id="cps">Save</button><button class="btn o" id="cpc">Cancel</button>');
   $('#cpc',d).onclick=function(){d.remove();openCheckpoints(done)};
