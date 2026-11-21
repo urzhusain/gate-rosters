@@ -31,6 +31,14 @@ h2{margin:4px 0 0;font-size:20px;font-weight:800}
 .nt.red .nc{color:var(--red)}
 .nt .ns{display:block;font-size:12px;color:var(--mute);line-height:1.25}
 .nt .nb{position:absolute;top:10px;right:10px;background:var(--red);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.att th{background:var(--navy);color:var(--on);font-size:14px;padding:10px 12px;text-align:left}
+.att td{padding:10px 12px}
+button.chip{font:inherit;font-weight:700;border:0;cursor:pointer}
+.dtabs{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;margin:10px 0 0}
+.dtabs button{flex:0 0 auto;font:inherit;font-weight:800;font-size:15px;padding:10px 16px;border-radius:999px;border:2px solid var(--navy);background:var(--card);color:var(--navy);cursor:pointer;white-space:nowrap;width:auto}
+.dtabs button.on{background:var(--navy);color:var(--on)}
+.dtabs button .tb{display:inline-block;margin-left:6px;background:var(--red);color:#fff;border-radius:999px;font-size:12px;padding:0 7px}
+.dg.tp{display:none;margin-top:10px}.dg.tp.on{display:grid}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .f{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
@@ -652,10 +660,11 @@ function attendCard(TC){
   };
   var all=dayC.concat(nightC),absN=all.filter(function(c){return c.presence==='Absent'}).length,newN=all.filter(function(c){return /NEW GUARD/.test(c.flags)}).length,dblN=all.filter(function(c){return /DOUBLE/.test(c.flags)}).length;
   var nDay=S.posts.filter(function(p){return exp(p,'Day')&&!dayC.some(function(c){return c.post===p})}).length,nNight=S.posts.filter(function(p){return exp(p,'Night')&&!nightC.some(function(c){return c.post===p})}).length;
-  var rows=S.posts.filter(function(p){return p!=='Control Room'||all.some(function(c){return c.post===p})}).map(function(p){return '<tr><td><b>'+esc(p)+'</b></td><td>'+cellOf(dayC,p,'Day')+'</td><td>'+cellOf(nightC,p,'Night')+'</td></tr>'}).join('');
+  S.attList={abs:all.filter(function(c){return c.presence==='Absent'}),new:all.filter(function(c){return /NEW GUARD/.test(c.flags)}),dbl:all.filter(function(c){return /DOUBLE/.test(c.flags)}),nd:S.posts.filter(function(p){return exp(p,'Day')&&!dayC.some(function(c){return c.post===p})}),nn:S.posts.filter(function(p){return exp(p,'Night')&&!nightC.some(function(c){return c.post===p})})};
+  var rows=S.posts.filter(function(p){return p!=='Control Room'||all.some(function(c){return c.post===p})}).map(function(p){return '<tr><td><b>'+esc(p)+'</b></td><td>'+cellOf(nightC,p,'Night')+'</td><td>'+cellOf(dayC,p,'Day')+'</td></tr>'}).join('');
   return '<div class="card w2"><div class="ct">Attendance today</div><div class="cs">Who was seen at each gate. Night = '+(nightDate===t?'tonight from 8 PM':'last night, 8 PM yesterday to 8 AM today')+'.</div>'+
-    '<div class="row" style="margin-bottom:6px"><span class="chip '+(absN?'red':'grn')+'">'+absN+' absent</span><span class="chip '+(newN?'yel':'')+'">'+newN+' new faces</span><span class="chip '+(dblN?'red':'')+'">'+dblN+' double duty</span><span class="chip '+(nDay?'yel':'grn')+'">'+nDay+' gates not checked (Day)</span><span class="chip '+(nNight?'yel':'grn')+'">'+nNight+' not checked (Night)</span></div>'+
-    '<div class="scr"><table class="att"><tr><th>Gate</th><th>Day shift</th><th>Night shift</th></tr>'+rows+'</table></div></div>'}
+    '<div class="row" style="margin-bottom:8px"><button type="button" class="chip '+(absN?'red':'grn')+'" data-ac="abs">'+absN+' absent</button><button type="button" class="chip '+(newN?'yel':'')+'" data-ac="new">'+newN+' new faces</button><button type="button" class="chip '+(dblN?'red':'')+'" data-ac="dbl">'+dblN+' double duty</button><button type="button" class="chip '+(nDay?'yel':'grn')+'" data-ac="nd">'+nDay+' gates not checked (Day)</button><button type="button" class="chip '+(nNight?'yel':'grn')+'" data-ac="nn">'+nNight+' not checked (Night)</button></div>'+
+    '<div class="scr"><table class="att"><tr><th>Gate</th><th>Night shift</th><th>Day shift</th></tr>'+rows+'</table></div></div>'}
 function repeatCard(cs,raised){
   var g={};cs.forEach(function(c){if(!c.guardId||(c.presence!=='Late'&&c.presence!=='Absent'))return;var o=g[c.guardId]=g[c.guardId]||{id:c.guardId,name:c.guard,late:0,abs:0};if(c.presence==='Late')o.late++;else o.abs++});
   var gl=Object.keys(g).map(function(k){return g[k]}).filter(function(o){return o.late+o.abs>=2}).sort(function(a,b){return (b.late+b.abs)-(a.late+a.abs)}).slice(0,6);
@@ -706,26 +715,34 @@ function viewHeadDash(){
     var TC=rs[4]&&rs[4].ok?rs[4].checks:[];
     all.forEach(function(i){var f=(i.log||[]).some(function(l){return /Forwarded to Sainik/.test(l.remark||'')}),g=(i.log||[]).some(function(l){return /Forwarded to Avenger/.test(l.remark||'')});if(inP(i.created.slice(0,10))){if(f)agency.Sainik++;if(g)agency.Avenger++}});
     var tbl='<details><summary class="muted" style="cursor:pointer">View as table</summary><div class="scr"><table><tr><th>Day</th><th>Raised</th><th>Resolved</th></tr>'+days.map(function(d,i){return '<tr><td>'+dShort(d)+'</td><td>'+perDayR[i]+'</td><td>'+perDayS[i]+'</td></tr>'}).join('')+'</table></div></details>';
+    S.dtab=S.dtab||'att';
     var html='<div class="dch"><div class="kpis">'+
       kpi('Issues',raised.length,'raised · '+solved.length+' resolved · '+open.length+' open'+(od.length?' ('+od.length+' overdue)':''),od.length?'var(--red)':'','issues')+
       kpi("Today's rounds",todayDone+' of '+todayRounds.length,roundSub,todayMiss?'var(--red)':'','rounds')+
       kpi('Absent found',abs,late?late+' late':'',abs?'var(--red)':'','absent')+
       kpi('Double duty',dbl.length,'same guard, other shift',dbl.length?'var(--red)':'','double')+
       kpi('Camera reports',cam.length,'seen on camera by Control Room','','camera')+
-    '</div><div class="dg" style="margin-top:12px">'+
-      attendCard(TC)+missCard(TC,RL)+
-      '<div class="w2">'+alertsCard(AL,5)+'</div>'+
-      repeatCard(cs,raised)+responseCard(raised)+
+    '</div>'+
+      '<div class="dtabs">'+[['att','Attendance',''],['alr','Alerts',AL.filter(function(a){return a.level==='high'}).length||''],['rep','Repeat problems',''],['rnd','Rounds',todayMiss||''],['iss','Issues',od.length||''],['gd','Guards & roster','']].map(function(t){return '<button type="button" data-dt="'+t[0]+'" class="'+(S.dtab===t[0]?'on':'')+'">'+t[1]+(t[2]?'<span class="tb">'+t[2]+'</span>':'')+'</button>'}).join('')+'</div>'+
+      '<div class="dg tp'+(S.dtab==='att'?' on':'')+'" data-tp="att">'+
+      attendCard(TC)+missCard(TC,RL)+'</div>'+
+      '<div class="dg tp'+(S.dtab==='alr'?' on':'')+'" data-tp="alr">'+
+      '<div class="w2">'+alertsCard(AL,5)+'</div>'+'</div>'+
+      '<div class="dg tp'+(S.dtab==='rep'?' on':'')+'" data-tp="rep">'+
+      repeatCard(cs,raised)+responseCard(raised)+'</div>'+
+      '<div class="dg tp'+(S.dtab==='rnd'?' on':'')+'" data-tp="rnd">'+
       '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. S1 = supervisor morning round, S2 = supervisor day round, S4 = supervisor evening round of the night watchmen, C4 = Control Room round, once a day at any time.</div>'+roundMatrix(RL,days)+'</div>'+
+      '<div class="card w2"><div class="ct">Round scan map</div><div class="cs">Which gates were checked, each day and shift</div>'+heatmap(days,S.posts,map)+'</div>'+'</div>'+
+      '<div class="dg tp'+(S.dtab==='iss'?' on':'')+'" data-tp="iss">'+
       '<div class="card w2"><div class="ct">Issues raised vs resolved, per day</div><div class="lg"><span><i style="background:var(--c1)"></i>Raised</span><span><i style="background:var(--c2)"></i>Resolved</span></div>'+dailyChart(days,perDayR,perDayS)+tbl+'</div>'+
       '<div class="card"><div class="ct">Issues by category</div><div class="cs">Raised in this period</div>'+hbars(catI,'var(--c1)')+'</div>'+
       '<div class="card"><div class="ct">Issues by gate</div><div class="cs">Raised in this period, with how many are still open</div>'+hbars(gateI,'var(--c1)')+'</div>'+
-      '<div class="card w2"><div class="ct">Round scan map</div><div class="cs">Which gates were checked, each day and shift</div>'+heatmap(days,S.posts,map)+'</div>'+
+      '<div class="card"><div class="ct">Unsolved for more than 24 hours</div>'+(od.length?od.sort(function(a,b){return parseT(a.created)-parseT(b.created)}).slice(0,6).map(issueLine).join(''):'<div class="flag ok">Nothing overdue.</div>')+'<button class="btn o s" data-tab-go="issues">All issues</button></div>'+
+      '<div class="card"><div class="ct">Latest camera reports</div>'+(cam.length?cam.slice(-5).reverse().map(issueLine).join(''):'<div class="muted">None in this period.</div>')+'</div>'+'</div>'+
+      '<div class="dg tp'+(S.dtab==='gd'?' on':'')+'" data-tp="gd">'+
       '<div class="card"><div class="ct">Attendance at checks</div><div class="cs">All guards seen in rounds</div>'+segBar([{l:'Present',v:pres,c:'var(--ok)'},{l:'Late',v:late,c:'var(--c4)'},{l:'Absent',v:abs,c:'var(--bad)'}])+'<div class="cs" style="margin-top:6px">Guard type</div>'+segBar([{l:'Regular',v:ty.Regular||0,c:'var(--c1)'},{l:'Temporary',v:ty.Temporary||0,c:'var(--c2)'},{l:'Permanent',v:ty.Permanent||0,c:'var(--c3)'},{l:'Rotation',v:ty.Rotation||0,c:'var(--c4)'}])+'</div>'+
       '<div class="card"><div class="ct">Absences by gate</div><div class="cs">Guards found absent in rounds</div>'+hbars(absI,'var(--bad)')+'<div class="ct" style="margin-top:6px">Sent to agency</div><div class="cs">Issues forwarded by the Control Room</div>'+hbars([{l:'Sainik Security',v:agency.Sainik},{l:'Avenger Security',v:agency.Avenger}],'var(--c1)',Math.max(1,agency.Sainik,agency.Avenger))+'</div>'+
-      '<div class="card"><div class="ct">Unsolved for more than 24 hours</div>'+(od.length?od.sort(function(a,b){return parseT(a.created)-parseT(b.created)}).slice(0,6).map(issueLine).join(''):'<div class="flag ok">Nothing overdue.</div>')+'<button class="btn o s" data-tab-go="issues">All issues</button></div>'+
-      '<div class="card"><div class="ct">Latest camera reports</div>'+(cam.length?cam.slice(-5).reverse().map(issueLine).join(''):'<div class="muted">None in this period.</div>')+'</div>'+
-      rosterCard().replace('<div class="card"','<div class="card w2"')+
+      rosterCard().replace('<div class="card"','<div class="card w2"')+'</div>'+
     '</div><div class="row" style="margin-top:12px"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">See today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button></div></div>';
     $('#hm').outerHTML='<div id="hm">'+html+'</div>';var root=$('#hm');goBtns(root);fillGateInstr();wireAlerts(root,AL);
     var nDays=dDays(rg[0],rg[1]).length;
@@ -737,6 +754,10 @@ function viewHeadDash(){
       double:function(){listModal('Double duty ('+rg[0].slice(5)+' to '+rg[1].slice(5)+')',dbl,function(c){return '<b>'+esc(c.guard||'No name')+'</b> · '+esc(c.post)+' · '+esc(c.shift)+'<br><small class="muted">'+esc(c.date.slice(5))+' '+esc(String(c.time).slice(-8,-3))+' · '+esc(c.flags)+'</small>'},'No double duty in this period.')}
     };
     [].forEach.call(root.querySelectorAll('[data-k]'),function(b){b.onclick=function(){go[b.dataset.k]()}});
+    [].forEach.call(root.querySelectorAll('[data-dt]'),function(b){b.onclick=function(){S.dtab=b.dataset.dt;[].forEach.call(root.querySelectorAll('[data-dt]'),function(x){x.classList.toggle('on',x===b)});[].forEach.call(root.querySelectorAll('[data-tp]'),function(p){p.classList.toggle('on',p.dataset.tp===S.dtab)})}});
+    [].forEach.call(root.querySelectorAll('[data-ac]'),function(b){b.onclick=function(){var k=b.dataset.ac,L=S.attList[k],fmtc=function(c){return '<b>'+esc(c.guard||'No name')+'</b> · '+esc(c.post)+' · '+esc(c.shift)+'<br><small class="muted">'+esc(c.date.slice(5))+' '+esc(String(c.time).slice(-8,-3))+(c.flags?' · '+esc(c.flags):'')+'</small>'};
+      if(k==='nd'||k==='nn')listModal2('Gates not checked ('+(k==='nd'?'day':'night')+' shift)',L.length?'<div class="row">'+L.map(function(p){return '<span class="chip yel">'+esc(p)+'</span>'}).join(' ')+'</div>':'<div class="flag ok">All gates checked.</div>');
+      else listModal({abs:'Absent today',new:'New faces today',dbl:'Double duty today'}[k],L,fmtc,'None.')}});
     [].forEach.call(root.querySelectorAll('[data-rg]'),function(b){b.onclick=function(){guardRecord(b.dataset.rg)}});
     [].forEach.call(root.querySelectorAll('.post[data-i]'),function(b){b.onclick=function(){openIssue(b.dataset.i)}});
   })}
