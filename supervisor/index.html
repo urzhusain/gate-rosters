@@ -633,6 +633,25 @@ function attendCard(TC){
   return '<div class="card w2"><div class="ct">Attendance today</div><div class="cs">Who was seen at each gate. Night = '+(nightDate===t?'tonight from 8 PM':'last night, 8 PM yesterday to 8 AM today')+'.</div>'+
     '<div class="row" style="margin-bottom:6px"><span class="chip '+(absN?'red':'grn')+'">'+absN+' absent</span><span class="chip '+(newN?'yel':'')+'">'+newN+' new faces</span><span class="chip '+(dblN?'red':'')+'">'+dblN+' double duty</span><span class="chip '+(nDay?'yel':'grn')+'">'+nDay+' gates not checked (Day)</span><span class="chip '+(nNight?'yel':'grn')+'">'+nNight+' not checked (Night)</span></div>'+
     '<div class="scr"><table class="att"><tr><th>Gate</th><th>Day shift</th><th>Night shift</th></tr>'+rows+'</table></div></div>'}
+function repeatCard(cs,raised){
+  var g={};cs.forEach(function(c){if(!c.guardId||(c.presence!=='Late'&&c.presence!=='Absent'))return;var o=g[c.guardId]=g[c.guardId]||{id:c.guardId,name:c.guard,late:0,abs:0};if(c.presence==='Late')o.late++;else o.abs++});
+  var gl=Object.keys(g).map(function(k){return g[k]}).filter(function(o){return o.late+o.abs>=2}).sort(function(a,b){return (b.late+b.abs)-(a.late+a.abs)}).slice(0,6);
+  var q={};raised.forEach(function(i){var k=i.post+'|'+i.category,o=q[k]=q[k]||{post:i.post,cat:i.category,n:0};o.n++});
+  var ql=Object.keys(q).map(function(k){return q[k]}).filter(function(o){return o.n>=2&&o.cat!==CAMCAT}).sort(function(a,b){return b.n-a.n}).slice(0,6);
+  return '<div class="card"><div class="ct">Repeat problems</div><div class="cs">Same guard or same gate more than once in this period</div>'+
+    '<div class="ct" style="margin-top:4px;font-size:14px">Guards late or absent again and again</div>'+(gl.length?gl.map(function(o){return '<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding:6px 0"><span><b>'+esc(o.name||o.id)+'</b><br><small class="muted">'+(o.abs?o.abs+' absent':'')+(o.abs&&o.late?' · ':'')+(o.late?o.late+' late':'')+'</small></span><button class="btn o s" data-rg="'+esc(o.id)+'">Record</button></div>'}).join(''):'<div class="flag ok" style="margin:0">None.</div>')+
+    '<div class="ct" style="margin-top:8px;font-size:14px">Gates with the same issue again</div>'+(ql.length?ql.map(function(o){return '<div style="border-top:1px solid var(--line);padding:6px 0"><b>'+esc(o.post)+'</b> · '+esc(o.cat)+' <span class="chip red">×'+o.n+'</span></div>'}).join(''):'<div class="flag ok" style="margin:0">None.</div>')+'</div>'}
+function responseCard(raised){
+  var rows=[];
+  raised.forEach(function(i){if(i.category===CAMCAT)return;var f=(i.log||[]).filter(function(l){return l.role==='control'&&l.action!=='Raised'})[0];
+    rows.push({i:i,m:f?Math.max(0,Math.round((parseT(f.time)-parseT(i.created))/60000)):null})});
+  var done=rows.filter(function(r){return r.m!==null}),avg=done.length?Math.round(done.reduce(function(a,r){return a+r.m},0)/done.length):null,fast=done.filter(function(r){return r.m<=30}).length;
+  var wait=rows.filter(function(r){return r.m===null&&r.i.status==='Open'}).map(function(r){return {i:r.i,m:Math.round(ageH(r.i.created)*60),w:1}});
+  var slow=wait.concat(done.map(function(r){return {i:r.i,m:r.m}})).sort(function(a,b){return b.m-a.m}).slice(0,4);
+  var fmt=function(m){return m<90?m+' min':m<2880?Math.round(m/60*10)/10+' h':Math.round(m/1440*10)/10+' days'};
+  return '<div class="card"><div class="ct">Control Room response time</div><div class="cs">How fast an issue is first acknowledged or worked on</div>'+
+    (rows.length?'<div class="row" style="gap:18px"><div><div class="muted" style="font-size:12.5px">Average first response</div><div style="font-size:26px;font-weight:800">'+(avg==null?'–':fmt(avg))+'</div></div><div><div class="muted" style="font-size:12.5px">Answered within 30 min</div><div style="font-size:26px;font-weight:800;color:'+(done.length&&fast/done.length<0.7?'var(--red)':'var(--fg)')+'">'+(done.length?Math.round(fast/done.length*100)+'%':'–')+'</div></div></div>'+
+      '<div class="ct" style="margin-top:8px;font-size:14px">Slowest</div>'+slow.map(function(o){return '<button class="post" data-i="'+esc(o.i.id)+'" style="flex-direction:row;justify-content:space-between;align-items:center;width:100%;margin-top:4px"><span><b>'+esc(o.i.id)+'</b> · '+esc(o.i.post)+'<br><small class="muted">'+esc(o.i.category)+'</small></span><span class="chip '+(o.w?'red':o.m>30?'yel':'grn')+'">'+(o.w?'waiting '+fmt(o.m):fmt(o.m))+'</span></button>'}).join(''):'<div class="muted">No issues in this period.</div>')+'</div>'}
 function viewHeadDash(){
   var m=$('#mn');m.classList.add('wide');var p=S.dp||'30',rg=dRange(p);
   m.innerHTML=DASH_CSS+'<div class="dh"><h2>Head Office dashboard</h2><div class="seg" id="dps"><button data-p="7"'+(p==='7'?' aria-pressed="true"':'')+'>7 days</button><button data-p="30"'+(p==='30'?' aria-pressed="true"':'')+'>30 days</button><button data-p="month"'+(p==='month'?' aria-pressed="true"':'')+'>This month</button></div></div><div id="hm" class="muted">Loading…</div>';
@@ -673,6 +692,7 @@ function viewHeadDash(){
     '</div><div class="dg" style="margin-top:12px">'+
       attendCard(TC)+
       '<div class="w2">'+alertsCard(AL,5)+'</div>'+
+      repeatCard(cs,raised)+responseCard(raised)+
       '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. S1 = supervisor morning round, S2 = supervisor day round, S4 = supervisor evening round of the night watchmen, C4 = Control Room morning round of the night watchmen.</div>'+roundMatrix(RL,days)+'</div>'+
       '<div class="card w2"><div class="ct">Issues raised vs resolved, per day</div><div class="lg"><span><i style="background:var(--c1)"></i>Raised</span><span><i style="background:var(--c2)"></i>Resolved</span></div>'+dailyChart(days,perDayR,perDayS)+tbl+'</div>'+
       '<div class="card"><div class="ct">Issues by category</div><div class="cs">Raised in this period</div>'+hbars(catI,'var(--c1)')+'</div>'+
@@ -694,6 +714,8 @@ function viewHeadDash(){
       double:function(){listModal('Double duty ('+rg[0].slice(5)+' to '+rg[1].slice(5)+')',dbl,function(c){return '<b>'+esc(c.guard||'No name')+'</b> · '+esc(c.post)+' · '+esc(c.shift)+'<br><small class="muted">'+esc(c.date.slice(5))+' '+esc(String(c.time).slice(-8,-3))+' · '+esc(c.flags)+'</small>'},'No double duty in this period.')}
     };
     [].forEach.call(root.querySelectorAll('[data-k]'),function(b){b.onclick=function(){go[b.dataset.k]()}});
+    [].forEach.call(root.querySelectorAll('[data-rg]'),function(b){b.onclick=function(){guardRecord(b.dataset.rg)}});
+    [].forEach.call(root.querySelectorAll('.post[data-i]'),function(b){b.onclick=function(){openIssue(b.dataset.i)}});
   })}
 /* ---------- rounds and alerts ---------- */
 function rChip(r){var m={done:['grn','Done'],open:['yel','Open now'],missed:['red','Missed'],upcoming:['','Later']}[r.status]||['',r.status];return '<span class="chip '+m[0]+'">'+m[1]+'</span>'}

@@ -470,6 +470,73 @@ function installAlerts() {
   return 'ok';
 }
 /** Runs every 10 minutes by itself, even when nobody has the app open. */
+/* ================= Daily summary email (9 AM) ================= */
+function digestText_() {
+  var t = today_(), y = dateAdd_(t, -1), st = settings_(), rm = roleMap_(), req = requiredPosts_();
+  var all = rows_('Checks'), from = dateAdd_(t, -15);
+  var checks = all.filter(function (c) { return c.Date === y || c.Date === t; });
+  var dayC = checks.filter(function (c) { return c.Date === y && c.Shift === 'Day'; });
+  var nightC = checks.filter(function (c) { return c.Shift === 'Night' && ((c.Date === y && clockMin_(c.Time) >= 720) || (c.Date === t && clockMin_(c.Time) < 720)); });
+  var nightPosts = {}; all.forEach(function (c) { if (c.Date >= from && c.Shift === 'Night' && c.Post !== 'Control Room') nightPosts[c.Post] = 1; });
+  var dayPosts = {}; all.forEach(function (c) { if (c.Date >= from && c.Shift === 'Day' && c.Post !== 'Control Room') dayPosts[c.Post] = 1; });
+  var seenPost = function (list, p) { return list.some(function (c) { return c.Post === p; }); };
+  var noDay = req.filter(function (p) { return dayPosts[p] && !seenPost(dayC, p); }), noNight = req.filter(function (p) { return nightPosts[p] && !seenPost(nightC, p); });
+  var both = dayC.concat(nightC);
+  var absent = both.filter(function (c) { return c.Presence === 'Absent'; }), late = both.filter(function (c) { return c.Presence === 'Late'; });
+  var newF = both.filter(function (c) { return /NEW GUARD/.test(c.Flags || ''); }), dbl = both.filter(function (c) { return /DOUBLE/.test(c.Flags || ''); });
+  var L = [];
+  L.push('SECURITY SUMMARY for ' + y + ' (day shift) and the night that followed');
+  L.push('');
+  L.push('GUARDS');
+  L.push('- Absent: ' + absent.length + (absent.length ? ' -> ' + absent.map(function (c) { return (c.Guard || 'no name') + ' (' + c.Post + ', ' + c.Shift + ')'; }).join('; ') : ''));
+  L.push('- Late: ' + late.length + (late.length ? ' -> ' + late.map(function (c) { return (c.Guard || 'no name') + ' (' + c.Post + ')'; }).join('; ') : ''));
+  L.push('- New faces: ' + newF.length + (newF.length ? ' -> ' + newF.map(function (c) { return (c.Guard || 'no name') + ' (' + c.Post + ', ' + c.Shift + ')'; }).join('; ') : ''));
+  L.push('- Double duty: ' + dbl.length + (dbl.length ? ' -> ' + dbl.map(function (c) { return (c.Guard || 'no name') + ' (' + c.Post + ')'; }).join('; ') : ''));
+  L.push('- Gates not checked, day shift: ' + (noDay.length ? noDay.join(', ') : 'none'));
+  L.push('- Gates not checked, night shift: ' + (noNight.length ? noNight.join(', ') : 'none'));
+  L.push('');
+  var rl = roundList_([y, t], all.filter(function (c) { return c.Date >= dateAdd_(y, -1); }), rm).filter(function (r) { return r.date === y || r.id === 'C4'; }).reverse();
+  L.push('ROUNDS');
+  rl.forEach(function (r) {
+    var who = r.role === 'control' ? 'Control Room' : 'Supervisor';
+    L.push('- ' + (r.date === t ? 'This morning' : 'Yesterday') + ' ' + r.name + ' (' + who + ', ' + r.from + ' to ' + r.to + '): ' + (r.status === 'done' ? 'DONE' : r.status === 'missed' ? 'MISSED' : r.status) + ', ' + r.done + ' of ' + r.total + ' gates' + (r.status === 'missed' && r.missing.length ? '. Not checked: ' + r.missing.join(', ') : ''));
+  });
+  L.push('');
+  var issues = rows_('Issues'), logs = rows_('Log'), od = Number(st.overdue_hours) || 24, nowT = new Date().getTime();
+  var raised = issues.filter(function (i) { return String(i.Created).slice(0, 10) === y; }), solvedY = issues.filter(function (i) { return i.Status === 'Solved' && String(i.SolvedAt).slice(0, 10) === y; });
+  var open = issues.filter(function (i) { return i.Status !== 'Solved'; });
+  var resp = [];
+  raised.forEach(function (i) {
+    if (i.Category === PRIVATE_CAT) return;
+    var first = logs.filter(function (l) { return l.IssueID === i.ID && l.Action !== 'Raised' && l.Role === 'control'; })[0];
+    if (first) resp.push((ts_(first.Time) - ts_(i.Created)) / 60000);
+  });
+  L.push('ISSUES');
+  L.push('- Raised yesterday: ' + raised.length + '. Solved yesterday: ' + solvedY.length + '. Open now: ' + open.length + '.');
+  if (resp.length) L.push('- Control Room first response: average ' + Math.round(resp.reduce(function (a, b) { return a + b; }, 0) / resp.length) + ' minutes (' + resp.length + ' issues).');
+  var unack = open.filter(function (i) { return i.Status === 'Open'; });
+  if (unack.length) L.push('- Not yet acknowledged: ' + unack.map(function (i) { return i.ID + ' (' + i.Post + ')'; }).join(', '));
+  var over = open.filter(function (i) { return (nowT - ts_(i.Created)) / 3600000 >= od; });
+  if (over.length) L.push('- Unsolved for more than ' + od + ' hours: ' + over.map(function (i) { return i.ID + ' ' + i.Post + ', ' + i.Category + ' (' + Math.round((nowT - ts_(i.Created)) / 3600000) + ' h)'; }).join('; '));
+  if (!unack.length && !over.length) L.push('- Nothing waiting for acknowledgement and nothing overdue.');
+  L.push('');
+  L.push('Open the app: https://urzhusain.github.io/gate-rosters/supervisor/');
+  L.push('(Automatic daily message from Aljamea Security Control.)');
+  return { subject: 'Security summary ' + y + ': ' + absent.length + ' absent, ' + (rl.filter(function (r) { return r.status === 'missed'; }).length) + ' rounds missed, ' + open.length + ' issues open', body: L.join('\n') };
+}
+function dailyDigest() {
+  var st = settings_(), to = String(st.alert_email || '').trim();
+  if (!to) return 'no email set';
+  var d = digestText_();
+  MailApp.sendEmail({ to: to, subject: d.subject, body: d.body });
+  return 'sent';
+}
+/** Run once in the editor: sends the summary every day at about 9 AM (India time). */
+function installDigest() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyDigest') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('dailyDigest').timeBased().atHour(9).nearMinute(0).everyDays(1).inTimezone(TZ).create();
+  return dailyDigest();
+}
 function alertTickAuto() { alertTick_(); }
 /** Looks for problems nobody has reported: missed rounds, unacknowledged and overdue issues. Runs at most every 4 minutes, whenever the app is used. */
 function alertTick_() {
