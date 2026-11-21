@@ -12,7 +12,8 @@ var HEAD = {
   Log: ['Time', 'IssueID', 'By', 'Role', 'Action', 'Remark', 'PhotoId'],
   Settings: ['Key', 'Value'],
   Users: ['Name', 'PIN', 'Role', 'Active'],
-  Alerts: ['Time', 'Type', 'Key', 'Level', 'Message', 'Audience']
+  Alerts: ['Time', 'Type', 'Key', 'Level', 'Message', 'Audience'],
+  Checkpoints: ['Time', 'Date', 'Id', 'Post', 'Result', 'Remark', 'PhotoId', 'By', 'Role']
 };
 var POSTS = ['Gate 1', 'Gate 2', 'Gate 4', 'Gate 6 (Rabvat)', 'Gate 8 & 9', 'MVD Gate 10', 'Mahad Gate',
   'Masakin front gate', 'Masakin back gate', 'Raj Manzil', 'Yusufi Makan', 'Ezzy Makan', 'Funun-ul-Quran',
@@ -204,6 +205,8 @@ function doPost(e) {
       case 'updateGuard': return json_(updateGuard_(q, by, role));
       case 'rounds': return json_(roundsOut_(role, q));
       case 'alerts': return json_(alertsOut_(role));
+      case 'checkpoints': return json_(cpOut_(q));
+      case 'submitCheckpoint': return json_(cpSubmit_(q, by, role));
       case 'submitCheck': return json_(submitCheck_(q, by, role));
       case 'raiseIssue': return json_(raiseIssue_(q, by, role));
       case 'issues': return json_(listIssues_(role, q));
@@ -470,6 +473,66 @@ function installAlerts() {
   return 'ok';
 }
 /** Runs every 10 minutes by itself, even when nobody has the app open. */
+/* ================= Checkpoints (timed duties at a gate) ================= */
+/** A checkpoint is a duty that must be confirmed once a day inside a time window. type 'photo' = photo of the register or gate; type 'check' = spot check, Matches or Problem. */
+var CHECKPOINTS = [
+  { id: 'K1', post: 'Masakin front gate', name: 'Gate closed at 9:30 PM', type: 'photo', from: '21:15', to: '22:00' },
+  { id: 'K2', post: 'Masakin back gate', name: 'Gate closed at 9:30 PM', type: 'photo', from: '21:15', to: '22:00' },
+  { id: 'R1', post: 'Gate 1', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '23:59' },
+  { id: 'R2', post: 'Gate 4', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '23:59' },
+  { id: 'R3', post: 'Gate 8 & 9', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '23:59' },
+  { id: 'O1', post: 'Gate 1', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' },
+  { id: 'O2', post: 'Gate 4', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' },
+  { id: 'O3', post: 'Gate 8 & 9', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' }
+];
+function cpSheet_() {
+  var ss = ss_(), sh = ss.getSheetByName('Checkpoints');
+  if (!sh) {
+    sh = ss.insertSheet('Checkpoints'); var cols = HEAD.Checkpoints.length;
+    sh.getRange(1, 1, sh.getMaxRows(), cols).setNumberFormat('@');
+    sh.getRange(1, 1, 1, cols).setValues([HEAD.Checkpoints]).setFontWeight('bold').setBackground('#1F3A5F').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function cpRows_() { cpSheet_(); return rows_('Checkpoints'); }
+/** Status of every checkpoint on the given dates, newest first. */
+function cpList_(dates, recs) {
+  var now = new Date().getTime(), out = [];
+  dates.forEach(function (d) {
+    CHECKPOINTS.forEach(function (C) {
+      var st = ts_(d + ' ' + C.from + ':00'), en = ts_(d + ' ' + C.to + ':00'), mine = recs.filter(function (r) { return r.Date === d && r.Id === C.id; });
+      var rec = mine.length ? mine[mine.length - 1] : null, status;
+      if (rec) status = rec.Result === 'Problem' ? 'problem' : (ts_(rec.Time) > en ? 'late' : 'done');
+      else status = now < st ? 'upcoming' : now <= en ? 'open' : 'missed';
+      out.push({ id: C.id, post: C.post, name: C.name, type: C.type, date: d, from: C.from, to: C.to, status: status,
+        by: rec ? rec.By : '', time: rec ? rec.Time : '', result: rec ? rec.Result : '', remark: rec ? rec.Remark : '', photo: rec ? rec.PhotoId : '' });
+    });
+  });
+  out.sort(function (a, b) { return a.date === b.date ? (a.from < b.from ? -1 : a.from > b.from ? 1 : 0) : (a.date < b.date ? 1 : -1); });
+  return out;
+}
+function cpOut_(q) {
+  var days = Math.min(Math.max(Number(q && q.days) || 1, 1), 14), dates = [], t = today_();
+  for (var i = 0; i < days; i++) dates.push(dateAdd_(t, -i));
+  return { ok: true, checkpoints: cpList_(dates, cpRows_().filter(function (r) { return r.Date >= dates[dates.length - 1]; })) };
+}
+function cpSubmit_(q, by, role) {
+  if (role !== 'supervisor' && role !== 'control') return { ok: false, error: 'Only the supervisor or the Control Room can confirm' };
+  var C = CHECKPOINTS.filter(function (x) { return x.id === q.id; })[0];
+  if (!C) return { ok: false, error: 'Unknown checkpoint' };
+  var t = today_(), now = new Date().getTime();
+  if (now < ts_(t + ' ' + C.from + ':00')) return { ok: false, error: 'Not open yet. It opens at ' + C.from + '.' };
+  var result = C.type === 'check' ? (q.result === 'Problem' ? 'Problem' : 'Matches') : 'Done';
+  if (C.type === 'photo' && role === 'supervisor' && !q.photo) return { ok: false, error: 'Take the photo with the camera. It is required.' };
+  if (result === 'Problem' && String(q.remark || '').trim().length < 3) return { ok: false, error: 'Write what the problem is' };
+  var photo = photo_(q.photo, 'cp_' + C.id);
+  cpSheet_();
+  add_('Checkpoints', { Time: now_(), Date: t, Id: C.id, Post: C.post, Result: result, Remark: String(q.remark || '').slice(0, 300), PhotoId: photo, By: by, Role: role });
+  if (result === 'Problem') raiseIssue_({ post: C.post, category: 'Gate pass / material', priority: 'Normal', description: C.name + ': ' + String(q.remark).trim(), photo: q.photo }, by, role);
+  return { ok: true };
+}
+
 /* ================= Daily summary email (9 AM) ================= */
 function digestText_() {
   var t = today_(), y = dateAdd_(t, -1), st = settings_(), rm = roleMap_(), req = requiredPosts_();
@@ -496,6 +559,10 @@ function digestText_() {
   L.push('- Gates not checked, night shift: ' + (noNight.length ? noNight.join(', ') : 'none'));
   L.push('');
   var rl = roundList_([y, t], all.filter(function (c) { return c.Date >= dateAdd_(y, -1); }), rm).filter(function (r) { return r.date === y || r.id === 'C4'; }).reverse();
+  var cpm = cpList_([y], cpRows_().filter(function (c) { return c.Date === y; })).filter(function (c) { return c.status === 'missed' || c.status === 'problem'; });
+  L.push('CHECKPOINTS');
+  L.push('- ' + (cpm.length ? cpm.map(function (c) { return c.name + ' at ' + c.post + ': ' + (c.status === 'missed' ? 'MISSED' : 'PROBLEM'); }).join('; ') : 'All confirmed yesterday'));
+  L.push('');
   L.push('ROUNDS');
   rl.forEach(function (r) {
     var who = r.role === 'control' ? 'Control Room' : 'Supervisor';
@@ -549,6 +616,12 @@ function alertTick_() {
     if (r.status !== 'missed' || nowT - ts_(r.date + ' ' + r.to + ':00') > 6 * 3600000) return;
     addAlert_('round', 'round:' + r.id + ':' + r.date, 'high', 'Missed round: ' + r.name + ' (' + (r.role === 'control' ? 'Control Room' : 'Supervisor') + '), ' + r.date + ' ' + r.from + ' to ' + r.to + '. Only ' + r.done + ' of ' + r.total + ' gates checked. Not checked: ' + r.missing.slice(0, 6).join(', ') + (r.missing.length > 6 ? '…' : ''), 'control,head');
   });
+  try {
+    cpList_([today, dateAdd_(today, -1)], cpRows_().filter(function (c) { return c.Date >= from; })).forEach(function (c) {
+      if (c.status !== 'missed' || nowT - ts_(c.date + ' ' + c.to + ':00') > 6 * 3600000) return;
+      addAlert_('checkpoint', 'cp:' + c.id + ':' + c.date, 'medium', 'Checkpoint missed: ' + c.name + ' at ' + c.post + ' (' + c.date + ', by ' + c.to + ')', 'control,head');
+    });
+  } catch (e) {}
   var od = Number(st.overdue_hours) || 24;
   rows_('Issues').forEach(function (i) {
     if (i.Status === 'Solved') return;

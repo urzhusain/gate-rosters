@@ -688,7 +688,7 @@ function viewHeadDash(){
   var m=$('#mn');m.classList.add('wide');var p=S.dp||'30',rg=dRange(p);
   m.innerHTML=DASH_CSS+'<div class="dh"><h2>Head Office dashboard</h2><div class="seg" id="dps"><button data-p="7"'+(p==='7'?' aria-pressed="true"':'')+'>7 days</button><button data-p="30"'+(p==='30'?' aria-pressed="true"':'')+'>30 days</button><button data-p="month"'+(p==='month'?' aria-pressed="true"':'')+'>This month</button></div></div><div id="hm" class="muted">Loading…</div>';
   [].forEach.call(document.querySelectorAll('#dps button'),function(b){b.onclick=function(){S.dp=b.dataset.p;viewHeadDash()}});
-  Promise.all([call('issues',{days:62}),call('checks',{from:rg[0],to:rg[1]}),call('rounds',{days:Math.min(31,dDays(rg[0],rg[1]).length)}),call('alerts'),call('checks',{from:ymd(-1),to:ymd(0)})]).then(function(rs){
+  Promise.all([call('issues',{days:62}),call('checks',{from:rg[0],to:rg[1]}),call('rounds',{days:Math.min(31,dDays(rg[0],rg[1]).length)}),call('alerts'),call('checks',{from:ymd(-1),to:ymd(0)}),call('checkpoints',{days:2})]).then(function(rs){
     if(!rs[0].ok||!rs[1].ok){$('#hm').innerHTML='<span class="err">'+esc(rs[0].ok?rs[1].error:rs[0].error)+'</span>';return}
     var all=rs[0].issues,cs=rs[1].checks,days=dDays(rg[0],rg[1]),inP=function(d){return d>=rg[0]&&d<=rg[1]};
     S.issues=all;
@@ -723,7 +723,7 @@ function viewHeadDash(){
       kpi('Double duty',dbl.length,'same guard, other shift',dbl.length?'var(--red)':'','double')+
       kpi('Camera reports',cam.length,'seen on camera by Control Room','','camera')+
     '</div>'+
-      '<div class="dtabs">'+[['att','Attendance',''],['alr','Alerts',AL.filter(function(a){return a.level==='high'}).length||''],['rep','Repeat problems',''],['rnd','Rounds',todayMiss||''],['iss','Issues',od.length||''],['gd','Guards & roster','']].map(function(t){return '<button type="button" data-dt="'+t[0]+'" class="'+(S.dtab===t[0]?'on':'')+'">'+t[1]+(t[2]?'<span class="tb">'+t[2]+'</span>':'')+'</button>'}).join('')+'</div>'+
+      '<div class="dtabs">'+[['att','Attendance',''],['alr','Alerts',AL.filter(function(a){return a.level==='high'}).length||''],['rep','Repeat problems',''],['rnd','Rounds',(todayMiss+(rs[5]&&rs[5].ok?rs[5].checkpoints.filter(function(c){return c.date===ymd(0)&&(c.status==='missed'||c.status==='problem')}).length:0))||''],['iss','Issues',od.length||''],['gd','Guards & roster','']].map(function(t){return '<button type="button" data-dt="'+t[0]+'" class="'+(S.dtab===t[0]?'on':'')+'">'+t[1]+(t[2]?'<span class="tb">'+t[2]+'</span>':'')+'</button>'}).join('')+'</div>'+
       '<div class="dg tp'+(S.dtab==='att'?' on':'')+'" data-tp="att">'+
       attendCard(TC)+missCard(TC,RL)+'</div>'+
       '<div class="dg tp'+(S.dtab==='alr'?' on':'')+'" data-tp="alr">'+
@@ -731,6 +731,7 @@ function viewHeadDash(){
       '<div class="dg tp'+(S.dtab==='rep'?' on':'')+'" data-tp="rep">'+
       repeatCard(cs,raised)+responseCard(raised)+'</div>'+
       '<div class="dg tp'+(S.dtab==='rnd'?' on':'')+'" data-tp="rnd">'+
+      (rs[5]&&rs[5].ok?cpCard(rs[5].checkpoints):'')+
       '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. S1 = supervisor morning round, S2 = supervisor day round, S4 = supervisor evening round of the night watchmen, C4 = Control Room round, once a day at any time.</div>'+roundMatrix(RL,days)+'</div>'+
       '<div class="card w2"><div class="ct">Round scan map</div><div class="cs">Which gates were checked, each day and shift</div>'+heatmap(days,S.posts,map)+'</div>'+'</div>'+
       '<div class="dg tp'+(S.dtab==='iss'?' on':'')+'" data-tp="iss">'+
@@ -761,6 +762,33 @@ function viewHeadDash(){
     [].forEach.call(root.querySelectorAll('[data-rg]'),function(b){b.onclick=function(){guardRecord(b.dataset.rg)}});
     [].forEach.call(root.querySelectorAll('.post[data-i]'),function(b){b.onclick=function(){openIssue(b.dataset.i)}});
   })}
+/* ---------- checkpoints (timed duties) ---------- */
+function cpChip(c){var m={done:['grn','Done'],late:['grn','Done (late)'],problem:['red','Problem'],open:['yel','Open now'],missed:['red','Missed'],upcoming:['','Later']}[c.status]||['',c.status];return '<span class="chip '+m[0]+'">'+m[1]+'</span>'}
+function cpRow(c,btn){var hm=function(t){return String(t).slice(11,16)};
+  return '<div style="border-top:1px solid var(--line);padding:9px 0"><div class="row" style="justify-content:space-between;align-items:flex-start"><span><b>'+esc(c.name)+'</b><br><small class="muted">'+esc(c.post)+' · '+esc(c.from)+' to '+esc(c.to)+'</small></span>'+cpChip(c)+'</div>'+
+    (c.time?'<small class="muted">'+(c.result==='Problem'?'<b style="color:var(--red)">Problem:</b> '+esc(c.remark)+' · ':c.type==='check'?'Matched · ':'')+'by '+esc(c.by)+' at '+hm(c.time)+(c.photo?' · <a href="'+full(c.photo)+'" target="_blank" rel="noopener">Photo</a>':'')+'</small>':'')+
+    (btn&&(c.status==='open'||c.status==='missed')?'<div style="margin-top:6px"><button class="btn s" data-cpc="'+esc(c.id)+'">'+(c.type==='check'?'Record spot check':'Confirm')+'</button></div>':'')+'</div>'}
+function cpCard(list){var t=ymd(0),y=ymd(-1),td=list.filter(function(c){return c.date===t}),ym=list.filter(function(c){return c.date===y&&(c.status==='missed'||c.status==='problem')});
+  return '<div class="card w2"><div class="ct">Checkpoints today</div><div class="cs">Timed duties: gate closing, register photos, outgoing material spot checks</div>'+(td.length?td.map(function(c){return cpRow(c,false)}).join(''):'<div class="muted">None.</div>')+
+    (ym.length?'<div class="ct" style="margin-top:8px;font-size:14px">Missed or problem yesterday</div>'+ym.map(function(c){return cpRow(c,false)}).join(''):'')+'</div>'}
+function cpDue(list){var t=ymd(0);return list.filter(function(c){return c.date===t&&(c.status==='open'||c.status==='missed')})}
+function openCheckpoints(done){
+  var d=modal('<h2>Checkpoints</h2><div id="cpb" class="muted">Loading…</div><button class="btn o" id="cpx">Close</button>');
+  $('#cpx',d).onclick=function(){d.remove();if(done)done()};
+  call('checkpoints',{days:1}).then(function(r){
+    if(!r.ok){$('#cpb',d).innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
+    var l=r.checkpoints;$('#cpb',d).outerHTML='<div id="cpb">'+'<div class="muted" style="margin-bottom:4px">Confirm each duty inside its time. Photos need the camera.</div>'+l.map(function(c){return cpRow(c,true)}).join('')+'</div>';
+    [].forEach.call(d.querySelectorAll('[data-cpc]'),function(b){b.onclick=function(){var c=l.filter(function(x){return x.id===b.dataset.cpc})[0];d.remove();confirmCp(c,done)}})})}
+function confirmCp(c,done){
+  var photo=c.type==='photo',d=modal('<h2>'+esc(c.name)+'</h2><div class="muted">'+esc(c.post)+'</div>'+
+    (photo?'<div class="f"><label>'+(c.id[0]==='R'?'Photo of the register page(s) for today':'Photo of the gate, closed')+(S.role==='supervisor'?' (required)':'')+'</label><input id="cpf" type="file" accept="image/*" capture="environment"></div>'
+      :'<div class="f"><label>Open the outgoing register, take the latest entry and check the goods physically. Does it match?</label><select id="cpr"><option value="Matches">Matches</option><option value="Problem">Problem</option></select></div>')+
+    '<div class="f"><label>'+(photo?'Remark (optional)':'Remark (required if Problem)')+'</label><input id="cpm"></div><div class="err" id="cpe"></div><button class="btn" id="cps">Save</button><button class="btn o" id="cpc">Cancel</button>');
+  $('#cpc',d).onclick=function(){d.remove();openCheckpoints(done)};
+  $('#cps',d).onclick=function(){var b=this;b.disabled=true;b.textContent='Saving…';
+    compress(photo?$('#cpf',d).files[0]:null).then(function(img){return call('submitCheckpoint',{id:c.id,photo:img,result:photo?'Done':$('#cpr',d).value,remark:$('#cpm',d).value})}).then(function(r){
+      b.disabled=false;b.textContent='Save';if(!r.ok){$('#cpe',d).textContent=r.error;return}
+      toast('Saved');d.remove();openCheckpoints(done)})}}
 /* ---------- rounds and alerts ---------- */
 function rChip(r){if(r.status==='done'&&r.late)return '<span class="chip grn">Done (late)</span>';var m={done:['grn','Done'],open:['yel','Open now'],missed:['red','Missed'],upcoming:['','Later']}[r.status]||['',r.status];return '<span class="chip '+m[0]+'">'+m[1]+'</span>'}
 function roundsCard(list){
@@ -803,7 +831,7 @@ function viewHome(){
   var m=$('#mn');m.classList.remove('wide');if(S.role==='head'){viewHeadDash();return}
   m.innerHTML='<h2>'+({supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role])+' dashboard</h2><div id="hm" class="muted">Loading…</div>';
   var wk=S.role==='head'?[ymd(-6),ymd(0)]:null;
-  var calls=[loadChecks(),call('issues')];if(wk)calls.push(call('checks',{from:wk[0],to:wk[1]}));else{calls.push(call('rounds',{days:2}));calls.push(call('alerts'))}
+  var calls=[loadChecks(),call('issues')];if(wk)calls.push(call('checks',{from:wk[0],to:wk[1]}));else{calls.push(call('rounds',{days:2}));calls.push(call('alerts'));calls.push(call('checkpoints',{days:2}))}
   Promise.all(calls).then(function(rs){
     if(!rs[0].ok||!rs[1].ok){$('#hm').innerHTML='<span class="err">'+esc(rs[0].ok?rs[1].error:rs[0].error)+'</span>';return}
     S.issues=vis(rs[1].issues);var cs=S.checks,all=S.issues,openI=all.filter(function(i){return i.status!=='Solved'}),od=all.filter(isOverdue);
@@ -815,7 +843,7 @@ function viewHome(){
       var todo=S.posts.filter(function(p){return !cur[p]}),mine=openI.filter(function(i){return i.raisedBy===S.name});
       html+='<div class="card"><b>Round progress · '+sh+' shift</b>'+covLine(sh+' shift',S.posts.length-todo.length,S.posts.length)+
         (todo.length?'<div class="muted">Still to check:</div><div class="row">'+todo.slice(0,6).map(function(p){return '<button class="chip yel" style="border:0;font:inherit;font-weight:800" data-chk="'+esc(p)+'">'+esc(p)+'</button>'}).join('')+(todo.length>6?'<span class="muted">+'+(todo.length-6)+' more</span>':'')+'</div>':'<div class="flag ok">All gates checked this shift.</div>')+
-        '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+'<div class="ng">'+(rs[2]&&rs[2].ok?(function(){var st=roundStats(rs[2].rounds);S.homeData={rounds:rs[2].rounds,mine:mine};return ntile('rounds','Rounds',st.open?'Open':(st.miss?st.miss:st.done+'/'+st.total),st.open?st.open.name:(st.miss?'missed':'done today'),st.miss?'red':(st.open?'yel':'grn'))})():'')+ntile('mine','My open issues',mine.length,mine.length?'tap to see':'all solved',mine.length?'yel':'grn')+'</div>'+rosterCard();
+        '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+'<div class="ng">'+(rs[2]&&rs[2].ok?(function(){var st=roundStats(rs[2].rounds);S.homeData={rounds:rs[2].rounds,mine:mine};return ntile('rounds','Rounds',st.open?'Open':(st.miss?st.miss:st.done+'/'+st.total),st.open?st.open.name:(st.miss?'missed':'done today'),st.miss?'red':(st.open?'yel':'grn'))})():'')+ntile('mine','My open issues',mine.length,mine.length?'tap to see':'all solved',mine.length?'yel':'grn')+(rs[4]&&rs[4].ok?(function(){var due=cpDue(rs[4].checkpoints);S.homeData.cp=1;return ntile('cp','Checkpoints',due.length,due.length?'to confirm now':'nothing due',due.length?'yel':'grn')})():'')+'</div>'+rosterCard();
     }else if(S.role==='control'){
       var un=openI.filter(function(i){return i.status==='Open'}),urg=openI.filter(function(i){return i.priority==='Urgent'});
       var al=rs[3]&&rs[3].ok?rs[3].alerts:[];S.alerts=al;
@@ -832,6 +860,7 @@ function viewHome(){
         ntile('overdue','Overdue',od.length,'unsolved over '+S.overdue+' h',od.length?'red':'grn')+
         ntile('gates','Gates not checked',miss.length,sh+' shift · '+(S.posts.length-miss.length)+' of '+S.posts.length+' done',miss.length?'yel':'grn')+
         ntile('warn','Warnings today',warn.length,'absent, double duty, new faces',warn.length?'red':'grn')+
+        (rs[4]&&rs[4].ok?(function(){var due=cpDue(rs[4].checkpoints);return ntile('cp','Checkpoints',due.length,due.length?'to confirm now':'nothing due',due.length?'yel':'grn')})():'')+
         '</div><div class="row"><button class="btn o s" data-tab-go="issues">All issues</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>'+rosterCard();
     }else{
       var wc=rs[2].ok?rs[2].checks:[],ab=wc.filter(function(c){return c.presence==='Absent'}),db=wc.filter(function(c){return /DOUBLE/.test(c.flags)});
@@ -851,6 +880,7 @@ function viewHome(){
       notices:openNotices,
       alerts:function(){openAlerts(H.al||[])},
       rounds:function(){openRounds(H.rounds||[])},
+      cp:function(){openCheckpoints(function(){viewHome()})},
       new:function(){goI('new')},open:function(){goI('open')},overdue:function(){goI('overdue')},
       mine:function(){var l=H.mine||[];listModal2('My open issues ('+l.length+')',l.length?l.map(issueLine).join(''):'<div class="flag ok">None. Everything you raised is solved.</div>').querySelectorAll('[data-issue]').forEach(function(b){b.onclick=function(){openIssue(b.dataset.issue)}})},
       gates:function(){var d=listModal2('Gates not checked ('+(H.sh||'').toLowerCase()+' shift)',(H.miss&&H.miss.length?'<div class="row">'+H.miss.map(function(p){return '<span class="chip yel">'+esc(p)+'</span>'}).join('')+'</div>':'<div class="flag ok">All gates checked this shift.</div>')+'<div class="muted" style="margin-top:6px">Day '+H.nd+' of '+S.posts.length+' · Night '+H.nn+' of '+S.posts.length+'</div>')},
