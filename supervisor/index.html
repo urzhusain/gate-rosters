@@ -168,7 +168,7 @@ function viewLogin(msg){
     S.pin=p;$('#lg').disabled=true;$('#lg').textContent='Checking…';
     call('bootstrap').then(function(r){
       if(!r.ok){S.pin='';viewLogin(r.error);return}
-      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.posts=r.posts;S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;
+      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.allposts=r.posts;S.posts=r.posts.filter(function(p){return p!=='Control Room'});S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;
       S.shift=defShift();S.tab=store('draft_raise')?'raise':'home';S.filter=r.role==='head'?'overdue':'open';
       main()})};
 }
@@ -274,7 +274,7 @@ function viewRaise(){
   var pf=S.prefill||{};S.prefill=null;if(!pf.description&&!pf.post){try{pf=JSON.parse(store('draft_raise')||'{}')||{}}catch(e){pf={}}}
   var cam=S.role==='control';if(cam&&!pf.category)pf.category='Suspicious activity (seen on camera)';
   $('#mn').innerHTML='<h2>'+(cam?'Report from cameras':'Raise an issue')+'</h2><div class="card">'+
-  '<div class="f"><label>Where?</label><select id="rp">'+S.posts.concat(['Other / whole campus']).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
+  '<div class="f"><label>Where?</label><select id="rp">'+S.allposts.concat(['Other / whole campus']).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>What kind?</label><select id="rc">'+CATS.filter(function(c){return (c!==INFOCAT||S.role==='head')&&(cam||S.role==='head'||c!==CAMCAT)}).map(function(c){return '<option'+(pf.category===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>How urgent?</label><div class="seg" id="up"><button data-u="Normal" aria-pressed="true">Normal</button><button data-u="Urgent" aria-pressed="false">Urgent</button></div></div>'+
   (cam?'<div class="f"><label>Camera or exact spot (optional)</label><input id="rcam" placeholder="e.g. Camera 12, near Gate 4 parking"></div>':'')+
@@ -495,7 +495,7 @@ function viewReport(){
   Promise.all([loadChecks(r0[0],r0[1]),call('issues')]).then(function(rs){
     if(!rs[0].ok){$('#rp').innerHTML='<span class="err">'+esc(rs[0].error)+'</span>';return}
     if(rs[1].ok)S.issues=vis(rs[1].issues);
-    var op=openIssuesByPost(),rows=S.posts.map(function(p){
+    var op=openIssuesByPost(),rows=S.allposts.map(function(p){
       var cs=S.checks.filter(function(c){return c.post===p}),n=function(f){return cs.filter(f).length};
       var slots={};cs.forEach(function(c){slots[c.date+c.shift]=1});
       return {p:p,slots:Object.keys(slots).length,abs:n(function(c){return c.presence==='Absent'}),late:n(function(c){return c.presence==='Late'}),
