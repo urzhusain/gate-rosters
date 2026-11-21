@@ -476,11 +476,9 @@ function installAlerts() {
 /* ================= Checkpoints (timed duties at a gate) ================= */
 /** A checkpoint is a duty that must be confirmed once a day inside a time window. type 'photo' = photo of the register or gate; type 'check' = spot check, Matches or Problem. */
 var CHECKPOINTS = [
-  { id: 'K1', post: 'Masakin front gate', name: 'Gate closed at 9:30 PM', type: 'photo', from: '21:15', to: '22:00', by: 'control' },
-  { id: 'K2', post: 'Masakin back gate', name: 'Gate closed at 9:30 PM', type: 'photo', from: '21:15', to: '22:00', by: 'control' },
-  { id: 'R1', post: 'Gate 1', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '23:59' },
-  { id: 'R2', post: 'Gate 4', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '23:59' },
-  { id: 'R3', post: 'Gate 8 & 9', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '23:59' },
+  { id: 'R1', post: 'Gate 1', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
+  { id: 'R2', post: 'Gate 4', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
+  { id: 'R3', post: 'Gate 8 & 9', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
   { id: 'O1', post: 'Gate 1', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' },
   { id: 'O2', post: 'Gate 4', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' },
   { id: 'O3', post: 'Gate 8 & 9', name: 'Outgoing material spot check', type: 'check', from: '09:00', to: '19:00' }
