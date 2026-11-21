@@ -408,7 +408,7 @@ var ROUNDS = [
   { id: 'S1', role: 'supervisor', name: 'Morning round', from: '09:00', to: '11:30' },
   { id: 'S2', role: 'supervisor', name: 'Day round (any time)', from: '11:30', to: '19:00' },
   { id: 'S4', role: 'supervisor', name: 'Night watchmen round (evening)', from: '19:30', to: '21:00' },
-  { id: 'C4', role: 'control', name: 'Night watchmen round (morning)', from: '06:30', to: '08:00' }
+  { id: 'C4', role: 'control', name: 'Night watchmen round (morning)', from: '06:30', to: '08:00', grace: 90 }
 ];
 function requiredPosts_() { return rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; }); }
 function dateAdd_(d, n) { var x = new Date(d + 'T12:00:00+05:30'); x.setDate(x.getDate() + n); return Utilities.formatDate(x, TZ, 'yyyy-MM-dd'); }
@@ -418,14 +418,14 @@ function roundList_(dates, checks, rm) {
   var minCover = Number(settings_().min_cover) || 0.9, req = requiredPosts_(), now = new Date().getTime(), out = [];
   dates.forEach(function (d) {
     ROUNDS.forEach(function (R) {
-      var st = ts_(d + ' ' + R.from + ':00'), en = ts_(d + ' ' + R.to + ':00'), posts = {};
+      var st = ts_(d + ' ' + R.from + ':00'), en = ts_(d + ' ' + R.to + ':00'), lim = en + (R.grace || 0) * 60000, posts = {}, late = false;
       if (en < firstT) return;
       checks.forEach(function (c) {
         if ((c.Role || roleOfName_(c.By, rm)) !== R.role) return;
-        var t = ts_(c.Time); if (t >= st && t <= en) posts[c.Post] = 1;
+        var t = ts_(c.Time); if (t >= st && t <= lim) { posts[c.Post] = 1; if (t > en) late = true; }
       });
-      var got = req.filter(function (p) { return posts[p]; }), status = now < st ? 'upcoming' : now <= en ? 'open' : (got.length >= Math.ceil(req.length * minCover) ? 'done' : 'missed');
-      out.push({ id: R.id, role: R.role, name: R.name, date: d, from: R.from, to: R.to, status: status, done: got.length, total: req.length,
+      var got = req.filter(function (p) { return posts[p]; }), status = now < st ? 'upcoming' : now <= en ? 'open' : (got.length >= Math.ceil(req.length * minCover) ? 'done' : (now <= lim ? 'open' : 'missed'));
+      out.push({ id: R.id, role: R.role, name: R.name, date: d, from: R.from, to: R.to, status: status, late: late && status === 'done', done: got.length, total: req.length,
         missing: req.filter(function (p) { return !posts[p]; }), start: st });
     });
   });

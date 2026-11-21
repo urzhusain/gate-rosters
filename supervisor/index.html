@@ -297,13 +297,13 @@ function viewRaise(){
 function isOverdue(i){return i.status!=='Solved'&&ageH(i.created)>=S.overdue}
 function viewIssues(){
   var m=$('#mn');
-  m.innerHTML='<h2>Issues</h2><div class="seg" id="fl"><button data-f="all">All</button><button data-f="overdue">Overdue</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
+  m.innerHTML='<h2>Issues</h2><div class="seg" id="fl"><button data-f="all">All</button><button data-f="overdue">Overdue</button><button data-f="new">Not acknowledged</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
   [].forEach.call(m.querySelectorAll('[data-f]'),function(b){b.setAttribute('aria-pressed',S.filter===b.dataset.f);b.onclick=function(){S.filter=b.dataset.f;renderIssues();[].forEach.call(m.querySelectorAll('[data-f]'),function(x){x.setAttribute('aria-pressed',S.filter===x.dataset.f)})}});
   var dd=S.idays||7;S.idays=null;S.iperiod=dd;
   call('issues',{days:dd}).then(function(r){if(!r.ok){$('#il').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}S.issues=vis(r.issues);renderIssues()});
 }
 function renderIssues(){
-  var all=S.issues||[],f=S.filter,list=all.filter(function(i){if(S.icat&&i.category!==S.icat)return false;return f==='all'?true:f==='overdue'?isOverdue(i):f==='open'?i.status!=='Solved':i.status==='Solved'});
+  var all=S.issues||[],f=S.filter,list=all.filter(function(i){if(S.icat&&i.category!==S.icat)return false;return f==='all'?true:f==='overdue'?isOverdue(i):f==='new'?i.status==='Open':f==='open'?i.status!=='Solved':i.status==='Solved'});
   list.sort(function(a,b){return (a.priority==='Urgent'?0:1)-(b.priority==='Urgent'?0:1)||parseT(a.created)-parseT(b.created)});
   var od=all.filter(isOverdue).length;
   var box=$('#il');
@@ -553,7 +553,7 @@ var DASH_CSS='<style>'+
 '.dg{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px}.dg .w2{grid-column:1/-1}'+
 '.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}'+
 '.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.05)}'+
-'button.kpi{text-align:left;font:inherit;cursor:pointer;width:100%;color:inherit}button.kpi:hover,button.kpi:focus-visible{border-color:var(--fg);outline:none}.kpi .go{font-size:12px;color:var(--c1);font-weight:700;margin-top:2px}.att td,.att th{vertical-align:top;font-size:13px}.att .ch{display:inline-block;margin:1px 3px 1px 0;white-space:nowrap}.kpi .l{font-size:13px;color:var(--mute);font-weight:600}.kpi .v{font-size:32px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--fg)}.kpi .s{font-size:12.5px;color:var(--mute)}'+
+'button.kpi{text-align:left;font:inherit;cursor:pointer;width:100%;color:inherit}button.kpi:hover,button.kpi:focus-visible{border-color:var(--fg);outline:none}.kpi .go{font-size:12px;color:var(--c1);font-weight:700;margin-top:2px}.att td,.att th{vertical-align:top;font-size:13px}.att .ch{display:inline-block;margin:1px 3px 1px 0;white-space:nowrap}.ng{display:grid;grid-template-columns:1fr 1fr;gap:10px}.nt{display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;color:inherit;background:var(--card,#fff);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;position:relative;min-height:92px}.nt:hover,.nt:focus-visible{border-color:var(--fg);outline:none}.nt.red{border-left-color:var(--red)}.nt.yel{border-left-color:#d99a00}.nt.grn{border-left-color:#2e7d32}.nt .nl{font-size:13px;font-weight:700;color:var(--muted,#555)}.nt .nc{font-size:30px;font-weight:800;line-height:1.1}.nt.red .nc{color:var(--red)}.nt .ns{font-size:12px;color:var(--muted,#555)}.nt .nb{position:absolute;top:8px;right:10px;background:var(--red);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 7px}.kpi .l{font-size:13px;color:var(--mute);font-weight:600}.kpi .v{font-size:32px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--fg)}.kpi .s{font-size:12.5px;color:var(--mute)}'+
 '.dh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}'+
 '.dh .seg{width:auto}.dh .seg button{padding:8px 14px;font-size:14px}'+
 '.ct{font-weight:800;font-size:16px;color:var(--navy)}.cs{font-size:12.5px;color:var(--mute);margin-top:-6px}'+
@@ -615,6 +615,14 @@ function roundReport(list){
       (r.status==='upcoming'?'<small class="muted">Not started yet.</small>':'<small>'+r.done+' of '+r.total+' gates checked'+(r.missing.length?'. <b>Not checked:</b> '+esc(r.missing.join(', ')):'. All gates checked.')+'</small>')+'</div>'}).join(''):'<div class="muted">No rounds today.</div>')+
     '<div class="muted" style="font-size:12.5px;margin-top:6px">A round is done when at least '+Math.round((S.minCover||0.9)*100)+'% of gates are checked inside its time.</div><button class="btn o" id="rpx">Close</button>');
   $('#rpx',d).onclick=function(){d.remove()}}
+function missCard(TC,RL){
+  var t=ymd(0),y=ymd(-1),nm=nowMin(),nightDate=nm>=1200?t:y,nextD=nightDate===t?null:t;
+  var mn=function(c){var m=String(c.time).match(/(\d+):(\d+)/);return m?(+m[1])*60+(+m[2]):0};
+  var dayS={},nS={};TC.forEach(function(c){if(c.date===t&&c.shift==='Day')dayS[c.post]=1;if(c.shift==='Night'&&((c.date===nightDate&&mn(c)>=720)||(nextD&&c.date===nextD&&mn(c)<720)))nS[c.post]=1});
+  var posts=S.posts.filter(function(p){return p!=='Control Room'}),md=posts.filter(function(p){return !dayS[p]}),mnn=posts.filter(function(p){return !nS[p]});
+  var rm=(RL||[]).filter(function(r){return r.date===t&&r.status==='missed'});
+  var ch=function(l){return l.length?l.map(function(p){return '<span class="chip red">'+esc(p)+'</span>'}).join(' '):'<span class="chip grn">All gates checked</span>'};
+  return '<div class="card w2"><div class="ct">Gates not checked today</div><div class="cs">'+(nm<720?'Day shift checks usually start after 9 AM.':'Gates with no check recorded yet.')+'</div><div style="margin:6px 0"><b>Day shift ('+md.length+')</b><div class="lg" style="flex-wrap:wrap">'+ch(md)+'</div></div><div style="margin:6px 0"><b>Night shift ('+mnn.length+')</b><div class="lg" style="flex-wrap:wrap">'+ch(mnn)+'</div></div>'+rm.map(function(r){return '<div style="margin:6px 0"><b>Missed: '+esc(r.name)+' '+r.from+'-'+r.to+'</b> <small class="muted">'+r.done+' of '+r.total+' gates</small><div class="lg" style="flex-wrap:wrap">'+ch(r.missing)+'</div></div>'}).join('')+'</div>'}
 function attendCard(TC){
   var t=ymd(0),y=ymd(-1),nm=nowMin(),EX=(window.SUP_CONFIG||{}).expected||{},nightDate=nm>=1200?t:y,nextD=nightDate===t?null:t;
   var mn=function(c){var m=String(c.time).match(/(\d+):(\d+)/);return m?(+m[1])*60+(+m[2]):0};
@@ -693,7 +701,7 @@ function viewHeadDash(){
       kpi('Double duty',dbl.length,'same guard, other shift',dbl.length?'var(--red)':'','double')+
       kpi('Camera reports',cam.length,'seen on camera by Control Room','','camera')+
     '</div><div class="dg" style="margin-top:12px">'+
-      attendCard(TC)+
+      attendCard(TC)+missCard(TC,RL)+
       '<div class="w2">'+alertsCard(AL,5)+'</div>'+
       repeatCard(cs,raised)+responseCard(raised)+
       '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. S1 = supervisor morning round, S2 = supervisor day round, S4 = supervisor evening round of the night watchmen, C4 = Control Room morning round of the night watchmen.</div>'+roundMatrix(RL,days)+'</div>'+
@@ -721,7 +729,7 @@ function viewHeadDash(){
     [].forEach.call(root.querySelectorAll('.post[data-i]'),function(b){b.onclick=function(){openIssue(b.dataset.i)}});
   })}
 /* ---------- rounds and alerts ---------- */
-function rChip(r){var m={done:['grn','Done'],open:['yel','Open now'],missed:['red','Missed'],upcoming:['','Later']}[r.status]||['',r.status];return '<span class="chip '+m[0]+'">'+m[1]+'</span>'}
+function rChip(r){if(r.status==='done'&&r.late)return '<span class="chip grn">Done (late)</span>';var m={done:['grn','Done'],open:['yel','Open now'],missed:['red','Missed'],upcoming:['','Later']}[r.status]||['',r.status];return '<span class="chip '+m[0]+'">'+m[1]+'</span>'}
 function roundsCard(list){
   var t=ymd(0),y=ymd(-1),show=list.filter(function(r){return (r.date===t)||(r.date===y&&r.status!=='upcoming'&&r.role==='control')}).slice().reverse();
   if(S.role==='control')show=show.filter(function(r){return r.date===t||r.status==='missed'||r.status==='open'||r.status==='done'});
@@ -734,12 +742,30 @@ function alertsCard(list,n){
   return '<div class="card"><div class="row" style="justify-content:space-between"><b>Alerts</b>'+(list.length>n?'<button class="btn o s" id="aall">All alerts ('+list.length+')</button>':'')+'</div>'+
    (list.length?list.slice(0,n).map(function(a){return '<div style="border-top:1px solid var(--line);padding-top:6px"><span class="chip '+(lv[a.level]||'')+'">'+esc(a.level==='high'?'Important':a.level==='medium'?'Check':'Info')+'</span> <small class="muted">'+esc(a.time.slice(5,16))+'</small><div>'+esc(a.message)+'</div></div>'}).join(''):'<div class="flag ok" style="margin:0">No alerts. Everything is on track.</div>')+'</div>'}
 function wireAlerts(root,list){var b=$('#aall',root);if(b)b.onclick=function(){var d=modal('<h2>All alerts</h2>'+list.map(function(a){return '<div style="border-bottom:1px solid var(--line);padding:6px 0"><small class="muted">'+esc(a.time.slice(5,16))+' · '+esc(a.level)+'</small><div>'+esc(a.message)+'</div></div>'}).join('')+'<button class="btn o" id="ax">Close</button>');$('#ax',d).onclick=function(){d.remove()}}}
-function noticesCard(all){
-  var l=all.filter(function(i){return i.category===INFOCAT&&i.status!=='Solved'}).sort(function(a,b){return parseT(a.created)-parseT(b.created)});
-  if(!l.length)return '';
+function noticeList(all){return all.filter(function(i){return i.category===INFOCAT&&i.status!=='Solved'}).sort(function(a,b){return parseT(a.created)-parseT(b.created)})}
+function noticeBody(l){
   var step=function(i,op,lab){var done=(op==='Acknowledged'&&(i.status==='Acknowledged'||i.status==='In progress'))||(op==='In progress'&&i.status==='In progress');return '<button class="btn '+(done?'g':'o')+' s" data-nt="'+esc(i.id)+'" data-op="'+op+'">'+(done?'✓ ':'')+lab+'</button>'};
-  return '<div class="card" style="border-color:var(--c1)"><b>Information from Head Office ('+l.length+')</b><div class="muted" style="font-size:13px">Tap Noted when you have read it, Informed when the watchmen or agency are told, and Planned when arrangements are made.</div>'+
-    l.map(function(i){return '<div style="border-top:1px solid var(--line);padding-top:8px"><div class="row" style="justify-content:space-between"><span><b>'+esc(i.id)+'</b> · '+esc(i.post)+' <small class="muted">'+ageTxt(i.created)+' ago</small></span>'+statusChip(i.status,i.category)+'</div><div style="white-space:pre-line;margin:4px 0 8px">'+esc(i.description)+'</div><div class="row">'+step(i,'Acknowledged','Noted')+step(i,'In progress','Informed')+'<button class="btn o s" data-nt="'+esc(i.id)+'" data-op="Solved">Planned</button><button class="btn o s" data-nview="'+esc(i.id)+'">Details</button></div></div>'}).join('')+'</div>'}
+  return '<div class="muted" style="font-size:13px;margin-bottom:6px">Tap Noted when you have read it, Informed when the watchmen or agency are told, and Planned when arrangements are made.</div>'+(l.length?l.map(function(i){return '<div style="border-top:1px solid var(--line);padding:8px 0"><div class="row" style="justify-content:space-between"><span><b>'+esc(i.id)+'</b> · '+esc(i.post)+' <small class="muted">'+ageTxt(i.created)+' ago</small></span>'+statusChip(i.status,i.category)+'</div><div style="white-space:pre-line;margin:4px 0 8px">'+esc(i.description)+'</div><div class="row">'+step(i,'Acknowledged','Noted')+step(i,'In progress','Informed')+'<button class="btn o s" data-nt="'+esc(i.id)+'" data-op="Solved">Planned</button></div></div>'}).join(''):'<div class="flag ok">No pending instructions from Head Office.</div>')}
+function openNotices(){
+  var l=noticeList(S.issues||[]);
+  var d=modal('<h2>Instructions from Head Office</h2>'+noticeBody(l)+'<button class="btn o" id="nx">Close</button>');
+  $('#nx',d).onclick=function(){d.remove()};
+  [].forEach.call(d.querySelectorAll('[data-nt]'),function(b){b.onclick=function(){var op=b.dataset.op;b.disabled=true;call('updateIssue',{id:b.dataset.nt,op:op,remark:INFOLBL[op]}).then(function(r){if(!r.ok){toast(r.error);b.disabled=false;return}toast('Marked '+INFOLBL[op]);d.remove();viewHome()})}})}
+function openAlerts(list){
+  var lv={high:'red',medium:'yel',info:''},seen=store('alerts_seen_'+S.role)||'';
+  var d=modal('<h2>Alerts</h2>'+(list.length?list.map(function(a){return '<div style="border-bottom:1px solid var(--line);padding:6px 0"><span class="chip '+(lv[a.level]||'')+'">'+esc(a.level==='high'?'Important':a.level==='medium'?'Check':'Info')+'</span> '+(a.time>seen?'<span class="chip red">NEW</span> ':'')+'<small class="muted">'+esc(a.time.slice(5,16))+'</small><div>'+esc(a.message)+'</div></div>'}).join(''):'<div class="flag ok">No alerts.</div>')+'<button class="btn o" id="ax">Close</button>');
+  if(list.length)store('alerts_seen_'+S.role,list.reduce(function(m,a){return a.time>m?a.time:m},''));
+  $('#ax',d).onclick=function(){d.remove();viewHome()}}
+function openRounds(list){
+  var d=modal(roundsCard(list)+'<button class="btn o" id="rx">Close</button>');goBtns(d);
+  [].forEach.call(d.querySelectorAll('[data-tab-go]'),function(b){b.addEventListener('click',function(){d.remove()})});
+  $('#rx',d).onclick=function(){d.remove()}}
+function roundStats(list){
+  var t=ymd(0),y=ymd(-1),mine=list.filter(function(r){return r.date===t||(r.date===y&&r.role==='control'&&r.status!=='upcoming')});
+  var miss=mine.filter(function(r){return r.status==='missed'&&r.date===t||(r.status==='missed'&&r.date===y)}).length,open=mine.filter(function(r){return r.status==='open'})[0],today=list.filter(function(r){return r.date===t}),done=today.filter(function(r){return r.status==='done'}).length;
+  return {miss:miss,open:open,done:done,total:today.length}}
+function ntile(key,label,count,sub,tone,badge){return '<button type="button" class="nt '+(tone||'')+'" data-n="'+key+'">'+(badge?'<span class="nb">'+badge+'</span>':'')+'<span class="nl">'+esc(label)+'</span><span class="nc">'+count+'</span><span class="ns">'+esc(sub||'')+'</span></button>'}
+function listModal2(title,html){var d=modal('<h2>'+esc(title)+'</h2>'+html+'<button class="btn o" id="lx">Close</button>');$('#lx',d).onclick=function(){d.remove()};return d}
 function viewHome(){
   var m=$('#mn');m.classList.remove('wide');if(S.role==='head'){viewHeadDash();return}
   m.innerHTML='<h2>'+({supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role])+' dashboard</h2><div id="hm" class="muted">Loading…</div>';
@@ -756,15 +782,24 @@ function viewHome(){
       var todo=S.posts.filter(function(p){return !cur[p]}),mine=openI.filter(function(i){return i.raisedBy===S.name});
       html+='<div class="card"><b>Round progress · '+sh+' shift</b>'+covLine(sh+' shift',S.posts.length-todo.length,S.posts.length)+
         (todo.length?'<div class="muted">Still to check:</div><div class="row">'+todo.slice(0,6).map(function(p){return '<button class="chip yel" style="border:0;font:inherit;font-weight:800" data-chk="'+esc(p)+'">'+esc(p)+'</button>'}).join('')+(todo.length>6?'<span class="muted">+'+(todo.length-6)+' more</span>':'')+'</div>':'<div class="flag ok">All gates checked this shift.</div>')+
-        '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+(rs[2]&&rs[2].ok?roundsCard(rs[2].rounds):'')+
-        '<div class="card"><b>My open issues ('+mine.length+')</b>'+(mine.length?mine.slice(0,4).map(issueLine).join(''):'<div class="muted">None. Everything you raised is solved.</div>')+'</div>'+rosterCard();
+        '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+'<div class="ng">'+(rs[2]&&rs[2].ok?(function(){var st=roundStats(rs[2].rounds);S.homeData={rounds:rs[2].rounds,mine:mine};return ntile('rounds','Rounds',st.open?'Open':(st.miss?st.miss:st.done+'/'+st.total),st.open?st.open.name:(st.miss?'missed':'done today'),st.miss?'red':(st.open?'yel':'grn'))})():'')+ntile('mine','My open issues',mine.length,mine.length?'tap to see':'all solved',mine.length?'yel':'grn')+'</div>'+rosterCard();
     }else if(S.role==='control'){
       var un=openI.filter(function(i){return i.status==='Open'}),urg=openI.filter(function(i){return i.priority==='Urgent'});
       var al=rs[3]&&rs[3].ok?rs[3].alerts:[];S.alerts=al;
-      html+=noticesCard(all)+alertsCard(al)+(rs[2]&&rs[2].ok?roundsCard(rs[2].rounds):'')+'<div class="row">'+tile('Open issues',openI.length)+tile('Overdue',od.length,od.length?'err':'')+'</div><div class="row">'+tile('Not acknowledged',un.length,un.length?'err':'')+tile('Urgent',urg.length,urg.length?'err':'')+'</div>'+
-        '<div class="card"><b>Needs action now</b>'+((un.concat(od.filter(function(i){return un.indexOf(i)<0}))).slice(0,5).map(issueLine).join('')||'<div class="muted">Nothing waiting.</div>')+'<button class="btn o s" data-tab-go="issues">All issues</button></div>'+
-        '<div class="card"><b>Coverage today</b>'+covLine('Day',nd,S.posts.length)+covLine('Night',nn,S.posts.length)+(S.posts.filter(function(p){return !cur[p]}).length?'<div class="muted">Not yet checked ('+sh.toLowerCase()+'): '+esc(S.posts.filter(function(p){return !cur[p]}).join(', '))+'</div>':'')+'<button class="btn o s" data-tab-go="today">See today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button></div>'+
-        '<div class="card"><b>Warnings today ('+warn.length+')</b>'+(warn.length?warn.slice(0,6).map(function(c){return '<div class="flag">'+esc(c.post)+' · '+c.shift+' · '+esc(c.guard||'no guard')+'<br>'+esc(c.flags)+'</div>'}).join(''):'<div class="muted">No warnings today.</div>')+'</div>'+rosterCard();
+      var rl=rs[2]&&rs[2].ok?rs[2].rounds:[],st=roundStats(rl),nl=noticeList(all),newNote=nl.filter(function(i){return i.status==='Open'}).length;
+      var seen=store('alerts_seen_control')||'',newAl=al.filter(function(a){return a.time>seen}).length,hiAl=al.filter(function(a){return a.time>seen&&a.level==='high'}).length;
+      var miss=S.posts.filter(function(p){return !cur[p]}),urgN=openI.filter(function(i){return i.priority==='Urgent'}).length;
+      S.homeData={al:al,rounds:rl,warn:warn,miss:miss,sh:sh,nd:nd,nn:nn};
+      html+='<div class="ng">'+
+        ntile('notices','Head Office instructions',nl.length,nl.length?(newNote?newNote+' not yet noted':'in progress'):'nothing pending',newNote?'red':(nl.length?'yel':'grn'),newNote?'NEW':'')+
+        ntile('alerts','Alerts',newAl,newAl?'new to review · '+al.length+' in all':al.length+' in all, all reviewed',hiAl?'red':(newAl?'yel':'grn'),hiAl?hiAl+' important':'')+
+        ntile('rounds','Rounds',st.open?'Open':(st.miss?st.miss:st.done+'/'+st.total),st.open?st.open.name:(st.miss?'missed':'done today'),st.miss?'red':(st.open?'yel':'grn'))+
+        ntile('new','Not acknowledged',un.length,un.length?'issues waiting for you':'all acknowledged',un.length?'red':'grn')+
+        ntile('open','Open issues',openI.length,urgN?urgN+' urgent':'none urgent',urgN?'red':(openI.length?'yel':'grn'))+
+        ntile('overdue','Overdue',od.length,'unsolved over '+S.overdue+' h',od.length?'red':'grn')+
+        ntile('gates','Gates not checked',miss.length,sh+' shift · '+(S.posts.length-miss.length)+' of '+S.posts.length+' done',miss.length?'yel':'grn')+
+        ntile('warn','Warnings today',warn.length,'absent, double duty, new faces',warn.length?'red':'grn')+
+        '</div><div class="row"><button class="btn o s" data-tab-go="issues">All issues</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>'+rosterCard();
     }else{
       var wc=rs[2].ok?rs[2].checks:[],ab=wc.filter(function(c){return c.presence==='Absent'}),db=wc.filter(function(c){return /DOUBLE/.test(c.flags)});
       var by=function(list){var o={};list.forEach(function(c){o[c.post]=(o[c.post]||0)+1});return Object.keys(o).map(function(k){return [k,o[k]]}).sort(function(a,b){return b[1]-a[1]}).slice(0,6)};
@@ -777,10 +812,19 @@ function viewHome(){
         '<div class="row"><button class="btn o s" data-tab-go="report">Gate report</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>';
     }
     $('#hm').outerHTML='<div id="hm" style="display:flex;flex-direction:column;gap:12px">'+html+'</div>';
-    var root=$('#hm');goBtns(root);fillGateInstr();if(S.role==='control')wireAlerts(root,S.alerts||[]);
+    var root=$('#hm');goBtns(root);fillGateInstr();
+    var H=S.homeData||{},goI=function(f){S.filter=f;S.icat=null;S.idays=7;S.tab='issues';main()};
+    var NT={
+      notices:openNotices,
+      alerts:function(){openAlerts(H.al||[])},
+      rounds:function(){openRounds(H.rounds||[])},
+      new:function(){goI('new')},open:function(){goI('open')},overdue:function(){goI('overdue')},
+      mine:function(){var l=H.mine||[];listModal2('My open issues ('+l.length+')',l.length?l.map(issueLine).join(''):'<div class="flag ok">None. Everything you raised is solved.</div>').querySelectorAll('[data-issue]').forEach(function(b){b.onclick=function(){openIssue(b.dataset.issue)}})},
+      gates:function(){var d=listModal2('Gates not checked ('+(H.sh||'').toLowerCase()+' shift)',(H.miss&&H.miss.length?'<div class="row">'+H.miss.map(function(p){return '<span class="chip yel">'+esc(p)+'</span>'}).join('')+'</div>':'<div class="flag ok">All gates checked this shift.</div>')+'<div class="muted" style="margin-top:6px">Day '+H.nd+' of '+S.posts.length+' · Night '+H.nn+' of '+S.posts.length+'</div>')},
+      warn:function(){var w=H.warn||[];listModal2('Warnings today ('+w.length+')',w.length?w.map(function(c){return '<div class="flag">'+esc(c.post)+' · '+c.shift+' · '+esc(c.guard||'no guard')+'<br>'+esc(c.flags)+'</div>'}).join(''):'<div class="flag ok">No warnings today.</div>')}
+    };
+    [].forEach.call(root.querySelectorAll('[data-n]'),function(b){b.onclick=function(){(NT[b.dataset.n]||function(){})()}});
     [].forEach.call(root.querySelectorAll('[data-chk]'),function(b){b.onclick=function(){S.shift=sh;openCheck(b.dataset.chk)}});
-    [].forEach.call(root.querySelectorAll('[data-nt]'),function(b){b.onclick=function(){var op=b.dataset.op;b.disabled=true;call('updateIssue',{id:b.dataset.nt,op:op,remark:INFOLBL[op]}).then(function(r){if(!r.ok){toast(r.error);b.disabled=false;return}toast('Marked '+INFOLBL[op]);viewHome()})}});
-    [].forEach.call(root.querySelectorAll('[data-nview]'),function(b){b.onclick=function(){openIssue(b.dataset.nview)}});
   });
 }
 function viewRoster(){
