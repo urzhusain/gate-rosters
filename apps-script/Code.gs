@@ -405,9 +405,8 @@ function listChecks_(from, to) {
 /* ================= Rounds and alerts ================= */
 /** Round windows (IST). A round is complete when at least min_cover of the gates were checked by that role inside the window. */
 var ROUNDS = [
-  { id: 'S1', role: 'supervisor', name: 'Morning round', from: '09:30', to: '11:30' },
-  { id: 'S2', role: 'supervisor', name: 'Midday round', from: '12:30', to: '14:30' },
-  { id: 'S3', role: 'supervisor', name: 'Afternoon round', from: '15:30', to: '17:30' },
+  { id: 'S1', role: 'supervisor', name: 'Morning round', from: '09:00', to: '11:30' },
+  { id: 'S2', role: 'supervisor', name: 'Day round (any time)', from: '11:30', to: '19:00' },
   { id: 'S4', role: 'supervisor', name: 'Night watchmen round (evening)', from: '19:30', to: '21:00' },
   { id: 'C4', role: 'control', name: 'Night watchmen round (morning)', from: '06:30', to: '08:00' }
 ];
