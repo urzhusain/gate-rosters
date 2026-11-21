@@ -408,7 +408,7 @@ var ROUNDS = [
   { id: 'S1', role: 'supervisor', name: 'Morning round', from: '09:00', to: '11:30' },
   { id: 'S2', role: 'supervisor', name: 'Day round (any time)', from: '11:30', to: '19:00' },
   { id: 'S4', role: 'supervisor', name: 'Night watchmen round (evening)', from: '19:30', to: '21:00' },
-  { id: 'C4', role: 'control', name: 'Night watchmen round (morning)', from: '06:30', to: '08:00', grace: 90 }
+  { id: 'C4', role: 'control', name: 'Control Room round (once a day, any time)', from: '00:00', to: '23:59' }
 ];
 function requiredPosts_() { return rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; }); }
 function dateAdd_(d, n) { var x = new Date(d + 'T12:00:00+05:30'); x.setDate(x.getDate() + n); return Utilities.formatDate(x, TZ, 'yyyy-MM-dd'); }

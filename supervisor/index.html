@@ -704,7 +704,7 @@ function viewHeadDash(){
       attendCard(TC)+missCard(TC,RL)+
       '<div class="w2">'+alertsCard(AL,5)+'</div>'+
       repeatCard(cs,raised)+responseCard(raised)+
-      '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. S1 = supervisor morning round, S2 = supervisor day round, S4 = supervisor evening round of the night watchmen, C4 = Control Room morning round of the night watchmen.</div>'+roundMatrix(RL,days)+'</div>'+
+      '<div class="card w2"><div class="ct">Round discipline</div><div class="cs">Each round must reach at least '+Math.round((S.minCover||0.9)*100)+'% of gates inside its time. S1 = supervisor morning round, S2 = supervisor day round, S4 = supervisor evening round of the night watchmen, C4 = Control Room round, once a day at any time.</div>'+roundMatrix(RL,days)+'</div>'+
       '<div class="card w2"><div class="ct">Issues raised vs resolved, per day</div><div class="lg"><span><i style="background:var(--c1)"></i>Raised</span><span><i style="background:var(--c2)"></i>Resolved</span></div>'+dailyChart(days,perDayR,perDayS)+tbl+'</div>'+
       '<div class="card"><div class="ct">Issues by category</div><div class="cs">Raised in this period</div>'+hbars(catI,'var(--c1)')+'</div>'+
       '<div class="card"><div class="ct">Issues by gate</div><div class="cs">Raised in this period, with how many are still open</div>'+hbars(gateI,'var(--c1)')+'</div>'+
