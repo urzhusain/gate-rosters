@@ -237,7 +237,7 @@ function addGuard_(q, by, role) {
   if (name.length < 3) return { ok: false, error: 'Enter the full name' };
   var shift = q.shift === 'Night' ? 'Night' : q.shift === 'Day' ? 'Day' : '';
   if (!shift) return { ok: false, error: 'Choose his shift: Day or Night' };
-  var agency = q.agency === 'Avenger' ? 'Avenger' : 'Sainik';
+  var agency = q.agency === 'Avenger' ? 'Avenger' : q.agency === 'Inhouse' ? 'Inhouse' : 'Sainik';
   if (role === 'supervisor' && !q.photo) return { ok: false, error: 'Take a photo of the guard with the camera' };
   var gs = rows_('Guards');
   for (var i = 0; i < gs.length; i++) {
@@ -256,7 +256,7 @@ function updateGuard_(q, by, role) {
   if (!g) return { ok: false, error: 'Guard not found' };
   var upd = {};
   if (q.shift === 'Day' || q.shift === 'Night') upd.RegularShift = q.shift;
-  if (q.agency === 'Sainik' || q.agency === 'Avenger') upd.Agency = q.agency;
+  if (q.agency === 'Sainik' || q.agency === 'Avenger' || q.agency === 'Inhouse') upd.Agency = q.agency;
   if (q.post !== undefined) upd.RegularPost = String(q.post);
   if (q.phone !== undefined) upd.Phone = String(q.phone).replace(/\D/g, '');
   if (q.status === 'Left' || q.status === 'Active') upd.Status = q.status;
