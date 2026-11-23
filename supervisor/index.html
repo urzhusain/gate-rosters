@@ -201,7 +201,7 @@ function main(){
 /* ---------- round ---------- */
 function viewRound(){
   var m=$('#mn');
-  m.innerHTML='<h2>Round</h2><div class="seg" id="sg"><button data-s="Day" aria-pressed="'+(S.shift==='Day')+'">Day</button><button data-s="Night" aria-pressed="'+(S.shift==='Night')+'">Night</button></div><div id="pl" class="muted">Loading…</div>';
+  m.innerHTML='<h2>Round</h2>'+profileCard()+'<div class="seg" id="sg"><button data-s="Day" aria-pressed="'+(S.shift==='Day')+'">Day</button><button data-s="Night" aria-pressed="'+(S.shift==='Night')+'">Night</button></div><div id="pl" class="muted">Loading…</div>';
   [].forEach.call(m.querySelectorAll('[data-s]'),function(b){b.onclick=function(){S.shift=b.dataset.s;viewRound()}});
   loadChecks().then(function(){
     var done={};(S.checks||[]).filter(function(c){return c.shift===S.shift}).forEach(function(c){done[c.post]=(done[c.post]||0)+1});
@@ -212,6 +212,8 @@ function viewRound(){
     [].forEach.call(m.querySelectorAll('[data-p]'),function(b){b.onclick=function(){openCheck(b.dataset.p)}});
   });
 }
+function profileCard(){var p=((window.SUP_CONFIG||{}).profiles||{})[S.role];if(!p)return '';
+  return '<div class="card" style="flex-direction:row;align-items:center;gap:14px"><img src="'+esc(p.photo)+'" alt="'+esc(p.name)+'" style="width:72px;height:72px;border-radius:50%;object-fit:cover;flex:none;border:3px solid var(--gold)"><div style="min-width:0"><b style="font-size:17px">'+esc(p.name)+'</b><div class="muted" style="font-size:13px">'+esc(p.title||'')+'</div></div></div>'}
 function loadChecks(from,to){return call('checks',{from:from||ymd(0),to:to||from||ymd(0)}).then(function(r){if(r.ok)S.checks=r.checks;else toast(r.error);return r})}
 function modal(html){var d=document.createElement('div');d.className='modal';d.innerHTML='<div class="sheet">'+html+'</div>';d.onclick=function(e){if(e.target===d)d.remove()};document.body.appendChild(d);return d}
 function openCheck(post){
