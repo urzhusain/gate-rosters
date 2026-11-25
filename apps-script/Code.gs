@@ -328,6 +328,7 @@ function updateGuard_(q, by, role) {
   if (q.shift === 'Day' || q.shift === 'Night') upd.RegularShift = q.shift;
   if (q.agency === 'Sainik' || q.agency === 'Avenger' || q.agency === 'Inhouse') upd.Agency = q.agency;
   if (q.post !== undefined) upd.RegularPost = String(q.post);
+  if (q.name !== undefined) { var nm = String(q.name).trim(); if (nm.length < 3) return { ok: false, error: 'Enter the full name' }; if (nm !== g.Name) upd.Name = nm; }
   if (q.phone !== undefined) upd.Phone = String(q.phone).replace(/\D/g, '');
   if (q.status === 'Left' || q.status === 'Active') upd.Status = q.status;
   if (q.photo) { var pid = photo_(q.photo, 'guard_' + g.ID); if (pid) upd.PhotoId = pid; }
