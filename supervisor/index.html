@@ -823,6 +823,9 @@ function openRounds(list){
   var d=modal(roundsCard(list)+'<button class="btn o" id="rx">Close</button>');goBtns(d);
   [].forEach.call(d.querySelectorAll('[data-tab-go]'),function(b){b.addEventListener('click',function(){d.remove()})});
   $('#rx',d).onclick=function(){d.remove()}}
+function openSupRounds(list){
+  var t=ymd(0),l=list.filter(function(r){return r.date===t||r.date===ymd(-1)});
+  listModal2('Supervisor rounds',(l.length?l.map(function(r){return '<div style="border-top:1px solid var(--line);padding:8px 0"><div class="row" style="justify-content:space-between;gap:8px"><span><b>'+esc(r.name)+'</b><br><small class="muted">'+(r.date===t?'Today ':'Yesterday ')+esc(r.from)+' to '+esc(r.to)+(r.status==='upcoming'?'':' · '+r.done+' of '+r.total+' gates checked')+'</small></span>'+rChip(r)+'</div>'+(r.status!=='upcoming'&&r.missing.length?'<small class="muted">Not checked: '+esc(r.missing.join(', '))+'</small>':'')+'</div>'}).join(''):'<div class="muted">No supervisor rounds yet.</div>')+'<div class="muted" style="margin-top:6px">See each gate check and its photo in Today by gate.</div>')}
 function roundStats(list){
   var t=ymd(0),y=ymd(-1),mine=list.filter(function(r){return r.date===t||(r.date===y&&r.role==='control'&&r.status!=='upcoming')});
   var miss=mine.filter(function(r){return r.status==='missed'&&r.date===t||(r.status==='missed'&&r.date===y)}).length,open=mine.filter(function(r){return r.status==='open'})[0],today=list.filter(function(r){return r.date===t}),done=today.filter(function(r){return r.status==='done'}).length;
@@ -841,6 +844,7 @@ function viewHome(){
     var cd=covOf('Day'),cn=covOf('Night'),nd=Object.keys(cd).length,nn=Object.keys(cn).length,sh=defShift(),cur=sh==='Day'?cd:cn;
     var warn=cs.filter(function(c){return /DOUBLE|ABSENT|NEW GUARD/.test(c.flags)});
     var html='';
+    if(S.role!=='head')html+=profileCard();
     if(S.role==='supervisor'){
       var todo=S.posts.filter(function(p){return !cur[p]}),mine=openI.filter(function(i){return i.raisedBy===S.name});
       html+='<div class="card"><b>Round progress · '+sh+' shift</b>'+covLine(sh+' shift',S.posts.length-todo.length,S.posts.length)+
@@ -849,20 +853,21 @@ function viewHome(){
     }else if(S.role==='control'){
       var un=openI.filter(function(i){return i.status==='Open'}),urg=openI.filter(function(i){return i.priority==='Urgent'});
       var al=rs[3]&&rs[3].ok?rs[3].alerts:[];S.alerts=al;
-      var rl=rs[2]&&rs[2].ok?rs[2].rounds:[],st=roundStats(rl),nl=noticeList(all),newNote=nl.filter(function(i){return i.status==='Open'}).length;
+      var rall=rs[2]&&rs[2].ok?rs[2].rounds:[],rl=rall.filter(function(r){return r.role==='control'}),srl=rall.filter(function(r){return r.role==='supervisor'}),st=roundStats(rl),sst=roundStats(srl),cpl=rs[4]&&rs[4].ok?rs[4].checkpoints:[],cpMiss=cpl.filter(function(c){return c.date===ymd(0)&&(c.status==='missed'||c.status==='problem')}).length,nl=noticeList(all),newNote=nl.filter(function(i){return i.status==='Open'}).length;
       var seen=store('alerts_seen_control')||'',newAl=al.filter(function(a){return a.time>seen}).length,hiAl=al.filter(function(a){return a.time>seen&&a.level==='high'}).length;
       var miss=S.posts.filter(function(p){return !cur[p]}),urgN=openI.filter(function(i){return i.priority==='Urgent'}).length;
-      S.homeData={al:al,rounds:rl,warn:warn,miss:miss,sh:sh,nd:nd,nn:nn};
+      S.homeData={al:al,rounds:rl,srounds:srl,warn:warn,miss:miss,sh:sh,nd:nd,nn:nn};
       html+='<div class="ng">'+
         ntile('notices','Head Office instructions',nl.length,nl.length?(newNote?newNote+' not yet noted':'in progress'):'nothing pending',newNote?'red':(nl.length?'yel':'grn'),newNote?'NEW':'')+
         ntile('alerts','Alerts',newAl,newAl?'new to review · '+al.length+' in all':al.length+' in all, all reviewed',hiAl?'red':(newAl?'yel':'grn'),hiAl?hiAl+' important':'')+
         ntile('rounds','Rounds',st.open?'Open':(st.miss?st.miss:st.done+'/'+st.total),st.open?st.open.name:(st.miss?'missed':'done today'),st.miss?'red':(st.open?'yel':'grn'))+
+        ntile('srounds','Supervisor rounds',sst.open?'Open':(sst.miss?sst.miss:sst.done+'/'+sst.total),sst.open?sst.open.name+' · '+sst.open.done+' of '+sst.open.total+' gates':(sst.miss?'missed today':'done today'),sst.miss?'red':(sst.open?'yel':'grn'))+
         ntile('new','Not acknowledged',un.length,un.length?'issues waiting for you':'all acknowledged',un.length?'red':'grn')+
         ntile('open','Open issues',openI.length,urgN?urgN+' urgent':'none urgent',urgN?'red':(openI.length?'yel':'grn'))+
         ntile('overdue','Overdue',od.length,'unsolved over '+S.overdue+' h',od.length?'red':'grn')+
         ntile('gates','Gates not checked',miss.length,sh+' shift · '+(S.posts.length-miss.length)+' of '+S.posts.length+' done',miss.length?'yel':'grn')+
         ntile('warn','Warnings today',warn.length,'absent, double duty, new faces',warn.length?'red':'grn')+
-        (rs[4]&&rs[4].ok?(function(){var due=cpDue(rs[4].checkpoints);return ntile('cp','Checkpoints',due.length,due.length?'to confirm now':'nothing due',due.length?'yel':'grn')})():'')+
+        (rs[4]&&rs[4].ok?(function(){var due=cpDue(rs[4].checkpoints);return ntile('cp','Checkpoints',due.length,cpMiss?cpMiss+' missed or problem today (register photos incl.)':(due.length?'to confirm now':'nothing due · tap to see photos'),cpMiss?'red':(due.length?'yel':'grn'),cpMiss?'MISSED':'')})():'')+
         '</div><div class="row"><button class="btn o s" data-tab-go="issues">All issues</button><button class="btn o s" data-tab-go="today">Today by gate</button><button class="btn o s" data-tab-go="guards">Guards</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div>'+rosterCard();
     }else{
       var wc=rs[2].ok?rs[2].checks:[],ab=wc.filter(function(c){return c.presence==='Absent'}),db=wc.filter(function(c){return /DOUBLE/.test(c.flags)});
@@ -882,6 +887,7 @@ function viewHome(){
       notices:openNotices,
       alerts:function(){openAlerts(H.al||[])},
       rounds:function(){openRounds(H.rounds||[])},
+      srounds:function(){openSupRounds(H.srounds||[])},
       cp:function(){openCheckpoints(function(){viewHome()})},
       new:function(){goI('new')},open:function(){goI('open')},overdue:function(){goI('overdue')},
       mine:function(){var l=H.mine||[];listModal2('My open issues ('+l.length+')',l.length?l.map(issueLine).join(''):'<div class="flag ok">None. Everything you raised is solved.</div>').querySelectorAll('[data-issue]').forEach(function(b){b.onclick=function(){openIssue(b.dataset.issue)}})},

@@ -441,7 +441,8 @@ function roundsOut_(role, q) {
   for (var i = 0; i < days; i++) dates.push(dateAdd_(today, -i));
   var from = dateAdd_(today, -days), checks = rows_('Checks').filter(function (c) { return c.Date >= from; });
   var list = roundList_(dates, checks, roleMap_());
-  if (role !== 'head') list = list.filter(function (r) { return r.role === role; });
+  /* Head Office sees all rounds; the Control Room also sees the supervisor's rounds; the supervisor sees only his own. */
+  if (role === 'supervisor') list = list.filter(function (r) { return r.role === role; });
   return { ok: true, rounds: list, minCover: Number(settings_().min_cover) || 0.9 };
 }
 
@@ -476,9 +477,9 @@ function installAlerts() {
 /* ================= Checkpoints (timed duties at a gate) ================= */
 /** A checkpoint is a duty that must be confirmed once a day inside a time window. type 'photo' = photo of the register or gate; type 'check' = spot check, Matches or Problem. */
 var CHECKPOINTS = [
-  { id: 'R1', post: 'Gate 1', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
-  { id: 'R2', post: 'Gate 4', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
-  { id: 'R3', post: 'Gate 8 & 9', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
+  { id: 'R1', by: 'supervisor', post: 'Gate 1', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
+  { id: 'R2', by: 'supervisor', post: 'Gate 4', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
+  { id: 'R3', by: 'supervisor', post: 'Gate 8 & 9', name: 'Register photo (visitors, deliveries, outgoing material)', type: 'photo', from: '17:00', to: '20:45' },
   { id: 'M1', post: 'Gate 8 & 9', name: 'Incoming material vs bill', type: 'check', from: '09:00', to: '19:00', hint: 'Take the latest incoming entry. Check the goods against the bill. Does the guard\'s tally match?' },
   { id: 'M2', post: 'Gate 8 & 9', name: 'Outgoing material vs gate pass', type: 'check', from: '09:00', to: '19:00', hint: 'Take the latest outgoing entry. Check the goods against the gate pass. Does the guard\'s tally match?' }
 ];
