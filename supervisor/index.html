@@ -205,11 +205,12 @@ function openOnDuty(){
     var st=new Date(now);if(sh==='Day'){st.setHours(8,0,0,0)}else{if(now.getHours()<8)st.setDate(st.getDate()-1);st.setHours(20,0,0,0)}
     var inShift=cs.filter(function(c){return c.shift===sh&&parseT(c.time)>=st&&c.presence!=='Absent'});
     var html=staff('supervisor','Supervisor','')+staff('control','Control Room',cw)+
-      '<div class="muted" style="font-size:13px">Seen = checked on post this shift. Roster = expected, not checked yet. Tap Share to send a watchman\'s card (name, photo, phone) as a link.</div>';
+      '<div class="muted" style="font-size:13px">Green = seen on post this shift. Grey = gate not checked yet this shift, so this is who is usually there. Tap Share to send a watchman\'s card (name, photo, phone) as a link.</div>';
     html+=(S.posts||[]).map(function(p){
       var seen={},rows=[];
       inShift.filter(function(c){return c.post===p}).forEach(function(c){if(!c.guardId||seen[c.guardId])return;seen[c.guardId]=1;var g=gInfo(c.guardId);rows.push({g:g.id?g:{name:c.guard,phone:'',photo:c.photo},how:'Seen '+String(c.time).slice(11,16)+(c.role==='control'?' (Control Room)':''),ok:1})});
-      (S.guards||[]).filter(function(g){return g.post===p&&g.shift===sh&&!seen[g.id]}).forEach(function(g){rows.push({g:g,how:'Roster · not checked yet',ok:0})});
+      /* Once a guard is seen at this gate this shift, show only who is actually there. Roster names only fill in for gates nobody has checked yet. */
+      if(!rows.length)(S.guards||[]).filter(function(g){return g.post===p&&g.shift===sh}).forEach(function(g){rows.push({g:g,how:'Not checked yet · usually here',ok:0})});
       return '<div class="card" style="padding:10px"><b>'+esc(p)+'</b>'+(rows.length?rows.map(function(r){var g=r.g;
         return '<div style="display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:8px">'+(g.photo?miniPh(g.photo,52):'<div style="width:52px;height:52px;border-radius:8px;background:var(--line)"></div>')+
           '<div style="flex:1;min-width:0"><b>'+esc(g.name||'No name')+'</b>'+(g.agency?' <span class="muted" style="font-size:12px">· '+esc(g.agency)+'</span>':'')+'<div><span class="chip '+(r.ok?'grn':'')+'" style="font-size:11px">'+esc(r.how)+'</span></div><div style="font-size:13px">'+phoneLinks(g.phone)+'</div></div>'+
