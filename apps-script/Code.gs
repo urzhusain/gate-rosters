@@ -198,11 +198,13 @@ function doPost(e) {
     lock.waitLock(20000);
     var q = JSON.parse(e.postData.contents);
     if (q.action === 'card') return json_(card_(q.t));
+    if (q.action === 'board') return json_(board_(q.t));
     var user = userOf_(q.pin);
     if (!user) return json_({ ok: false, error: 'Wrong PIN' });
     var role = user.role, by = user.name;
     switch (q.action) {
       case 'bootstrap': return json_(bootstrap_(role, by));
+      case 'resetBoard': return json_(resetBoard_(role));
       case 'addGuard': return json_(addGuard_(q, by, role));
       case 'updateGuard': return json_(updateGuard_(q, by, role));
       case 'rounds': return json_(roundsOut_(role, q));
@@ -229,7 +231,8 @@ function bootstrap_(role, name) {
   return {
     ok: true, role: role, name: name, overdueHours: Number(s.overdue_hours) || 24, rounds: ROUNDS, minCover: Number(s.min_cover) || 0.9,
     posts: rows_('Posts').map(function (r) { return r.Post; }).filter(String),
-    guards: rows_('Guards').filter(function (g) { return g.Status !== 'Left'; }).map(guardOut_)
+    guards: rows_('Guards').filter(function (g) { return g.Status !== 'Left'; }).map(guardOut_),
+    boardToken: role === 'supervisor' ? '' : boardToken_()
   };
 }
 function guardOut_(g) {
@@ -247,6 +250,41 @@ function shareToken_(id) {
   if (!id) return '';
   var b = Utilities.computeHmacSha256Signature(String(id), shareSecret_());
   return Utilities.base64EncodeWebSafe(b).replace(/=+$/, '').slice(0, 18);
+}
+/* ---- Live "on duty" board: one secret link shows every gate and who is on duty this shift. Head Office can reset the link. ---- */
+function boardToken_() {
+  var t = settings_().board_token;
+  if (!t) { t = Utilities.getUuid().replace(/-/g, '').slice(0, 20); setSetting_('board_token', t); }
+  return t;
+}
+function resetBoard_(role) {
+  if (role !== 'head') return { ok: false, error: 'Only Head Office can reset the link' };
+  var t = Utilities.getUuid().replace(/-/g, '').slice(0, 20); setSetting_('board_token', t);
+  return { ok: true, boardToken: t };
+}
+function board_(t) {
+  if (!t || String(t) !== boardToken_()) return { ok: false, error: 'This link is not valid or has been reset.' };
+  var now = new Date(), nowS = now_(), h = Number(nowS.slice(11, 13)), shift = (h >= 8 && h < 20) ? 'Day' : 'Night';
+  var startD = shift === 'Day' ? today_() : (h < 8 ? dateAdd_(today_(), -1) : today_());
+  var start = ts_(startD + ' ' + (shift === 'Day' ? '08:00:00' : '20:00:00'));
+  var guards = rows_('Guards').filter(function (g) { return g.Status !== 'Left'; }), byId = {};
+  guards.forEach(function (g) { byId[g.ID] = g; });
+  var from = dateAdd_(today_(), -1);
+  var checks = rows_('Checks').filter(function (c) { return c.Date >= from && c.Shift === shift && c.Presence !== 'Absent' && ts_(c.Time) >= start; });
+  checks.sort(function (a, b) { return a.Time < b.Time ? 1 : -1; });
+  var posts = rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; });
+  var card = function (g, seen) { return { name: g.Name, phone: g.Phone, photo: g.PhotoId, agency: g.Agency, seen: seen || '' }; };
+  var out = posts.map(function (p) {
+    var seen = {}, list = [];
+    checks.filter(function (c) { return c.Post === p; }).forEach(function (c) {
+      if (!c.GuardId || seen[c.GuardId]) return; seen[c.GuardId] = 1;
+      var g = byId[c.GuardId]; if (g) list.push(card(g, String(c.Time).slice(11, 16)));
+    });
+    var checked = list.length > 0;
+    if (!checked) guards.filter(function (g) { return g.RegularPost === p && g.RegularShift === shift; }).forEach(function (g) { list.push(card(g, '')); });
+    return { post: p, checked: checked, guards: list };
+  });
+  return { ok: true, shift: shift, updated: nowS, gates: out };
 }
 /** Public: no PIN. Returns only name, photo, phone, gate, shift and agency of the one guard the link is for. */
 function card_(t) {

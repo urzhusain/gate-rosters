@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>On Duty · Aljamea-tus-Saifiyah</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Watchmen on duty · Aljamea-tus-Saifiyah">
+<meta property="og:description" content="Every gate and who is on duty now, with photo and phone.">
+<meta property="og:image" content="https://urzhusain.github.io/gate-rosters/supervisor/og-image.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="../assets/icon-180.png"><link rel="apple-touch-icon" href="../assets/icon-180.png">
+<style>
+:root{
+  --bg:#F2F2F7;--card:#FFFFFF;--fg:#000;--mute:#6E6E73;--sep:rgba(60,60,67,.14);--fill:rgba(118,118,128,.12);
+  --blue:#007AFF;--green:#34C759;--gold:#F2B84B;--navy:#1F3A5F;--glass:rgba(242,242,247,.78);
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);--lift:0 18px 50px rgba(0,0,0,.22);
+  --f:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1C1C1E;--fg:#fff;--mute:#98989F;--sep:rgba(84,84,88,.5);--fill:rgba(118,118,128,.24);--blue:#0A84FF;--green:#30D158;--glass:rgba(0,0,0,.72);--shadow:none;--lift:0 18px 50px rgba(0,0,0,.6)}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}body{background:var(--bg);color:var(--fg);font:17px/1.35 var(--f);-webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.bar{position:sticky;top:0;z-index:10;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--sep);padding:calc(10px + env(safe-area-inset-top)) 18px 10px}
+.wrap{max-width:1080px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mute);font-weight:600}
+.brand img{width:22px;height:22px;border-radius:6px}
+h1{font-size:34px;line-height:1.1;font-weight:800;letter-spacing:-.02em;margin:6px 0 2px}
+.sub{color:var(--mute);font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.live{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--green)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(52,199,89,.6);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(52,199,89,0)}100%{box-shadow:0 0 0 0 rgba(52,199,89,0)}}
+.search{margin-top:10px;display:flex;align-items:center;gap:8px;background:var(--fill);border-radius:12px;padding:8px 12px}
+.search input{flex:1;border:0;background:transparent;font:inherit;font-size:16px;color:var(--fg);outline:none}
+.search svg{flex:none;opacity:.55}
+main{padding:16px 18px 40px}
+.sec{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);font-weight:600;margin:18px 4px 8px}
+.staff{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.st{background:var(--card);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);text-align:left}
+.st img{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)}
+.st b{display:block;font-size:16px}.st small{color:var(--mute);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.tile{position:relative;background:var(--card);border-radius:22px;padding:14px;box-shadow:var(--shadow);text-align:left;display:flex;flex-direction:column;gap:12px;min-height:150px;transition:transform .35s cubic-bezier(.2,.9,.3,1.2),box-shadow .35s}
+.tile:active{transform:scale(.97)}
+@media (hover:hover){.tile:hover{transform:translateY(-3px) scale(1.02);box-shadow:var(--lift);z-index:3}}
+.tile h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em;padding-right:30px}
+.cnt{position:absolute;top:12px;right:12px;min-width:26px;height:26px;border-radius:13px;background:var(--fill);font-size:14px;font-weight:700;display:grid;place-items:center;padding:0 7px}
+.av{display:flex;align-items:center}
+.av img,.av .ph{width:54px;height:54px;border-radius:50%;object-fit:cover;border:3px solid var(--card);margin-right:-14px;background:var(--fill);box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.nm{font-size:14px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm b{color:var(--fg);font-weight:600}
+.stt{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;border-radius:999px;padding:4px 10px;align-self:flex-start}
+.stt.ok{background:rgba(52,199,89,.15);color:#1E8E3E}.stt.no{background:var(--fill);color:var(--mute)}
+@media (prefers-color-scheme:dark){.stt.ok{color:var(--green)}}
+/* hover preview */
+.peek{position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%) scale(.85);transform-origin:50% 100%;opacity:0;pointer-events:none;transition:opacity .2s,transform .35s cubic-bezier(.2,.9,.3,1.25);background:var(--glass);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border-radius:24px;padding:12px;box-shadow:var(--lift);display:flex;gap:10px;z-index:20;border:.5px solid var(--sep)}
+@media (hover:hover){.tile:hover .peek{opacity:1;transform:translateX(-50%) scale(1);pointer-events:auto}}
+.pc{width:140px;background:var(--card);border-radius:18px;padding:10px;text-align:center;transition:transform .25s}
+.pc:hover{transform:scale(1.05)}
+.pc img,.pc .ph{width:96px;height:96px;border-radius:50%;object-fit:cover;background:var(--fill);border:3px solid var(--gold);display:block;margin:0 auto 6px}
+.pc b{display:block;font-size:14px;line-height:1.2}.pc small{color:var(--mute);font-size:12px}
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;transition:opacity .3s;z-index:40}
+.scrim.on{opacity:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;background:var(--bg);border-radius:22px 22px 0 0;z-index:50;transform:translateY(100%);transition:transform .45s cubic-bezier(.2,.9,.25,1);max-height:92vh;overflow:auto;padding:8px 16px calc(24px + env(safe-area-inset-bottom))}
+@media (min-width:700px){.sheet{bottom:auto;top:50%;border-radius:24px;transform:translateY(-40%) scale(.92);opacity:0;transition:transform .4s cubic-bezier(.2,.9,.3,1.2),opacity .25s}}
+.sheet.on{transform:translateY(0)}
+@media (min-width:700px){.sheet.on{transform:translateY(-50%) scale(1);opacity:1}}
+.grab{width:36px;height:5px;border-radius:3px;background:var(--sep);margin:2px auto 10px}
+.shh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.shh h3{margin:0;font-size:22px;font-weight:800}
+.x{width:30px;height:30px;border-radius:50%;background:var(--fill);display:grid;place-items:center;font-size:16px;color:var(--mute)}
+.list{background:var(--card);border-radius:14px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:10px 14px;width:100%;text-align:left}
+.row+.row{border-top:.5px solid var(--sep)}
+.row img,.row .ph{width:52px;height:52px;border-radius:50%;object-fit:cover;background:var(--fill)}
+.row .t{flex:1;min-width:0}.row b{display:block}.row small{color:var(--mute);font-size:13px}
+.chev{color:var(--mute);font-size:22px}
+.cc{text-align:center;padding:8px 4px 4px}
+.cc img,.cc .ph{width:180px;height:180px;border-radius:50%;object-fit:cover;border:4px solid var(--gold);background:var(--fill);display:block;margin:6px auto 12px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.cc h3{font-size:28px;font-weight:800;margin:0 0 4px;letter-spacing:-.01em}
+.cc .m{color:var(--mute);font-size:15px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.act{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--card);border-radius:14px;padding:12px;text-decoration:none;color:var(--blue);font-size:13px;font-weight:600}
+.act svg{width:26px;height:26px}
+.num{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:10px;text-align:left}
+.num small{color:var(--mute);font-size:13px;display:block}.num a{color:var(--blue);font-size:18px;text-decoration:none}
+.empty{color:var(--mute);text-align:center;padding:40px 10px}
+.err{color:#FF3B30;font-weight:600;text-align:center;padding:40px 10px}
+footer{color:var(--mute);font-size:12px;text-align:center;padding:10px}
+</style></head><body>
+<div class="bar"><div class="wrap">
+  <div class="brand"><img src="../assets/icon-180.png" alt="">Aljamea-tus-Saifiyah · Security</div>
+  <h1>On Duty</h1>
+  <div class="sub"><span class="live"><i></i>Live</span><span id="meta">Loading…</span></div>
+  <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search gate or name" autocomplete="off"></label>
+</div></div>
+<main class="wrap">
+  <div class="sec">In charge</div><div class="staff" id="staff"></div>
+  <div class="sec" id="gh">Gates</div><div class="grid" id="grid"><div class="empty">Loading…</div></div>
+</main>
+<footer>Shared by the Aljamea security office. Green = seen on post this shift. Grey = gate not checked yet, showing who is usually there.</footer>
+<div class="scrim" id="scrim"></div><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+<script src="config.js"></script>
+<script>
+(function(){
+  var T=new URLSearchParams(location.search).get('t')||'',D=null,stack=[];
+  var $=function(s){return document.querySelector(s)};
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})}
+  function img(id,sz){return id?'<img loading="lazy" alt="" src="https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w'+(sz||300)+'">':'<div class="ph"></div>'}
+  function num(p){var d=String(p||'').replace(/\D/g,'');return d.length===10?'91'+d:d}
+  var IC={call:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>',
+    wa:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6-.3.4c-.1.1-.3.3-.1.6.2.3.8 1.2 1.6 2 1.1 1 2 1.3 2.3 1.4.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.7-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.3z"/></svg>'};
+  function stt(g){return g.seen?'<span class="stt ok">● Seen '+esc(g.seen)+'</span>':'<span class="stt no">Not checked yet</span>'}
+  /* staff row from config */
+  var P=(window.SUP_CONFIG||{}).profiles||{},cw=(window.SUP_CONFIG||{}).controlWhatsapp;
+  $('#staff').innerHTML=[['control','Control Room',cw],['supervisor','Supervisor','']].map(function(x){var p=P[x[0]];if(!p)return '';
+    return '<button class="st" data-staff="'+x[0]+'"><img src="'+esc(p.photo)+'" alt=""><div><b>'+esc(p.name)+'</b><small>'+esc(x[1])+'</small></div></button>'}).join('');
+  [].forEach.call(document.querySelectorAll('[data-staff]'),function(b){b.onclick=function(){var k=b.dataset.staff,p=P[k];
+    openCard({name:p.name,role:k==='control'?'Control Room':'Supervisor',photoUrl:p.photo,phone:k==='control'?cw:''})}});
+  /* sheets */
+  function open(html){var s=$('#sheet');s.innerHTML='<div class="grab"></div>'+html;$('#scrim').style.display='block';requestAnimationFrame(function(){$('#scrim').classList.add('on');s.classList.add('on')});
+    [].forEach.call(s.querySelectorAll('.x'),function(b){b.onclick=closeAll});}
+  function closeAll(){stack=[];$('#scrim').classList.remove('on');$('#sheet').classList.remove('on');setTimeout(function(){if(!$('#sheet').classList.contains('on'))$('#scrim').style.display='none'},350)}
+  $('#scrim').onclick=closeAll;$('#scrim').style.display='none';
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll()});
+  function openGate(gi){var g=D.gates[gi];stack=[gi];
+    open('<div class="shh"><h3>'+esc(g.post)+'</h3><button class="x" aria-label="Close">✕</button></div><div style="margin-bottom:10px">'+(g.checked?'<span class="stt ok">● Checked this shift</span>':'<span class="stt no">Not checked yet · usually here</span>')+'</div>'+
+      (g.guards.length?'<div class="list">'+g.guards.map(function(x,i){return '<button class="row" data-gi="'+gi+'" data-i="'+i+'">'+img(x.photo,200)+'<span class="t"><b>'+esc(x.name)+'</b><small>'+esc(x.agency||'')+(x.seen?' · seen '+esc(x.seen):'')+'</small></span><span class="chev">›</span></button>'}).join('')+'</div>':'<div class="empty">No watchman listed for this gate.</div>'));
+    [].forEach.call($('#sheet').querySelectorAll('[data-i]'),function(b){b.onclick=function(){openGuard(+b.dataset.gi,+b.dataset.i)}})}
+  function openGuard(gi,i){var g=D.gates[gi],x=g.guards[i];openCard({name:x.name,role:'Watchman · '+g.post,photo:x.photo,phone:x.phone,agency:x.agency,seen:x.seen,back:gi})}
+  function openCard(c){var n=num(c.phone);
+    open('<div class="shh">'+(c.back!=null?'<button id="bk" style="color:var(--blue);font-size:17px">‹ '+esc(D.gates[c.back].post)+'</button>':'<span></span>')+'<button class="x" aria-label="Close">✕</button></div>'+
+      '<div class="cc">'+(c.photoUrl?'<img alt="" src="'+esc(c.photoUrl)+'">':img(c.photo,600))+'<h3>'+esc(c.name)+'</h3><div class="m">'+esc(c.role)+(c.agency?' · '+esc(c.agency):'')+'</div>'+(c.seen!==undefined?'<div style="margin-top:10px">'+stt(c)+'</div>':'')+'</div>'+
+      (n?'<div class="acts"><a class="act" href="tel:+'+n+'">'+IC.call+'Call</a><a class="act" href="https://wa.me/'+n+'" target="_blank" rel="noopener">'+IC.wa+'WhatsApp</a></div><div class="num"><small>mobile</small><a href="tel:+'+n+'">+'+esc(n)+'</a></div>':'<div class="empty" style="padding:16px">No phone number saved.</div>'));
+    var bk=$('#bk');if(bk)bk.onclick=function(){openGate(c.back)}}
+  /* render */
+  function render(){
+    var q=($('#q').value||'').trim().toLowerCase(),gates=D.gates.map(function(g,i){return {g:g,i:i}}).filter(function(o){return !q||o.g.post.toLowerCase().indexOf(q)>-1||o.g.guards.some(function(x){return String(x.name).toLowerCase().indexOf(q)>-1})});
+    $('#gh').textContent='Gates · '+D.gates.filter(function(g){return g.checked}).length+' of '+D.gates.length+' checked';
+    $('#grid').innerHTML=gates.length?gates.map(function(o){var g=o.g,gs=g.guards;
+      return '<button class="tile" data-g="'+o.i+'"><span class="cnt">'+gs.length+'</span><h2>'+esc(g.post)+'</h2>'+
+        '<div class="av">'+(gs.length?gs.slice(0,4).map(function(x){return img(x.photo,200)}).join(''):'<div class="ph"></div>')+'</div>'+
+        '<div class="nm">'+(gs.length?gs.map(function(x){return '<b>'+esc(String(x.name).split(' ')[0])+'</b>'}).join(', '):'Nobody listed')+'</div>'+
+        (g.checked?'<span class="stt ok">● Seen '+esc(gs[0]&&gs[0].seen||'')+'</span>':'<span class="stt no">Not checked yet</span>')+
+        (gs.length?'<div class="peek">'+gs.slice(0,3).map(function(x,i){return '<div class="pc" data-pg="'+o.i+'" data-pi="'+i+'">'+img(x.photo,300)+'<b>'+esc(x.name)+'</b><small>'+(x.seen?'Seen '+esc(x.seen):'Usually here')+'</small></div>'}).join('')+'</div>':'')+
+      '</button>'}).join(''):'<div class="empty">No gate or name matches.</div>';
+    [].forEach.call(document.querySelectorAll('.tile'),function(b){b.onclick=function(e){var pc=e.target.closest('.pc');if(pc){e.stopPropagation();openGuard(+pc.dataset.pg,+pc.dataset.pi);return}openGate(+b.dataset.g)}});
+  }
+  $('#q').addEventListener('input',function(){if(D)render()});
+  function load(){
+    if(!T){$('#grid').innerHTML='<div class="err">This link is not valid.</div>';$('#meta').textContent='';return}
+    fetch(SUP_CONFIG.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'board',t:T})}).then(function(r){return r.json()}).then(function(r){
+      if(!r.ok){$('#grid').innerHTML='<div class="err">'+esc(r.error||'Not available')+'</div>';$('#meta').textContent='';return}
+      D=r;$('#meta').textContent=r.shift+' shift · updated '+String(r.updated).slice(11,16);if(!$('#sheet').classList.contains('on'))render();
+    }).catch(function(){$('#meta').textContent='No connection. Retrying…'});
+  }
+  load();setInterval(load,120000);
+})();
+</script>
+</body></html>

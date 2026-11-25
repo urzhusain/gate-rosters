@@ -200,11 +200,12 @@ function openOnDuty(){
   $('#odx',d).onclick=function(){d.remove()};
   var staff=function(k,role,ph){var p=P[k];if(!p)return '';return '<div class="card" style="flex-direction:row;align-items:center;gap:12px;padding:10px"><img src="'+esc(p.photo)+'" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)"><div><b>'+esc(p.name)+'</b><div class="muted" style="font-size:13px">'+esc(role)+'</div>'+(ph?'<div style="font-size:14px">'+phoneLinks(ph)+'</div>':'')+'</div></div>'};
   Promise.all([call('bootstrap'),call('checks',{from:ymd(-1),to:ymd(0)})]).then(function(rs){
-    if(rs[0].ok&&rs[0].guards)S.guards=rs[0].guards;
+    if(rs[0].ok&&rs[0].guards)S.guards=rs[0].guards;if(rs[0].ok&&rs[0].boardToken)S.boardToken=rs[0].boardToken;
     var cs=rs[1].ok?rs[1].checks:[];
     var st=new Date(now);if(sh==='Day'){st.setHours(8,0,0,0)}else{if(now.getHours()<8)st.setDate(st.getDate()-1);st.setHours(20,0,0,0)}
     var inShift=cs.filter(function(c){return c.shift===sh&&parseT(c.time)>=st&&c.presence!=='Absent'});
-    var html=staff('supervisor','Supervisor','')+staff('control','Control Room',cw)+
+    var bu=S.boardToken?'https://urzhusain.github.io/gate-rosters/supervisor/board.html?t='+S.boardToken:'';
+    var html=(bu?'<div class="card" style="padding:10px;gap:6px"><b>Share the whole list</b><div class="muted" style="font-size:13px">One link that shows every gate and who is on duty, live. Anyone with the link can see names, photos and phone numbers.</div><div class="row"><button class="btn s" id="obs">Share list link</button><a class="btn o s" href="'+bu+'" target="_blank" rel="noopener" style="text-decoration:none;text-align:center">Open</a>'+(S.role==='head'?'<button class="btn o s" id="obr">Reset link</button>':'')+'</div></div>':'')+staff('supervisor','Supervisor','')+staff('control','Control Room',cw)+
       '<div class="muted" style="font-size:13px">Green = seen on post this shift. Grey = gate not checked yet this shift, so this is who is usually there. Tap Share to send a watchman\'s card (name, photo, phone) as a link.</div>';
     html+=(S.posts||[]).map(function(p){
       var seen={},rows=[];
@@ -217,6 +218,8 @@ function openOnDuty(){
           (g.share?'<button class="btn o s" data-sg="'+esc(g.id)+'">Share</button>':'')+'</div>'}).join(''):'<div class="muted">Nobody seen or on the roster for this shift.</div>')+'</div>'}).join('');
     $('#odl',d).outerHTML='<div id="odl" style="display:flex;flex-direction:column;gap:10px">'+html+'</div>';
     [].forEach.call(d.querySelectorAll('[data-sg]'),function(b){b.onclick=function(){var g=gInfo(b.dataset.sg);if(g.share)shareGuard(g)}});
+    if($('#obs',d))$('#obs',d).onclick=function(){if(navigator.share){navigator.share({title:'Watchmen on duty · Aljamea',url:bu}).catch(function(){});return}window.open('https://wa.me/?text='+encodeURIComponent('Watchmen on duty now, all gates:\n'+bu),'_blank','noopener')};
+    if($('#obr',d))$('#obr',d).onclick=function(){var b=this;b.disabled=true;b.textContent='Resetting…';call('resetBoard').then(function(r){if(!r.ok){toast(r.error);b.disabled=false;b.textContent='Reset link';return}S.boardToken=r.boardToken;toast('New link made. The old link no longer works.');d.remove();openOnDuty()})};
   });
 }
 
@@ -231,7 +234,7 @@ function viewLogin(msg){
     S.pin=p;$('#lg').disabled=true;$('#lg').textContent='Checking…';
     call('bootstrap').then(function(r){
       if(!r.ok){S.pin='';viewLogin(r.error);return}
-      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.allposts=r.posts;S.posts=r.posts.filter(function(p){return p!=='Control Room'});S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;
+      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.allposts=r.posts;S.posts=r.posts.filter(function(p){return p!=='Control Room'});S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;S.boardToken=r.boardToken||'';
       S.shift=defShift();S.tab=store('draft_raise')?'raise':'home';S.filter=r.role==='head'?'overdue':'open';
       main()})};
 }
