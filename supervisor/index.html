@@ -207,11 +207,13 @@ function openOnDuty(){
     var bu=S.boardToken?'https://urzhusain.github.io/gate-rosters/supervisor/board.html?t='+S.boardToken:'';
     var html=(bu?'<div class="card" style="padding:10px;gap:6px"><b>Share the whole list</b><div class="muted" style="font-size:13px">One link that shows every gate and who is on duty, live. Anyone with the link can see names, photos and phone numbers.</div><div class="row"><button class="btn s" id="obs">Share list link</button><a class="btn o s" href="'+bu+'" target="_blank" rel="noopener" style="text-decoration:none;text-align:center">Open</a>'+(S.role==='head'?'<button class="btn o s" id="obr">Reset link</button>':'')+'</div></div>':'')+staff('supervisor','Supervisor','')+staff('control','Control Room',cw)+
       '<div class="muted" style="font-size:13px">Green = seen on post this shift. Grey = gate not checked yet this shift, so this is who is usually there. Tap Share to send a watchman\'s card (name, photo, phone) as a link.</div>';
+    var lastAt={};inShift.forEach(function(c){if(c.guardId&&!lastAt[c.guardId])lastAt[c.guardId]=c.post});
     html+=(S.posts||[]).map(function(p){
-      var seen={},rows=[];
-      inShift.filter(function(c){return c.post===p}).forEach(function(c){if(!c.guardId||seen[c.guardId])return;seen[c.guardId]=1;var g=gInfo(c.guardId);rows.push({g:g.id?g:{name:c.guard,phone:'',photo:c.photo},how:'Seen '+String(c.time).slice(11,16)+(c.role==='control'?' (Control Room)':''),ok:1})});
+      var seen={},rows=[],mine=inShift.filter(function(c){return c.post===p}),lt=mine.length?parseT(mine[0].time):0;
+      /* only the latest visit to this gate (within 30 min), and a guard only at the gate he was seen at last */
+      mine.filter(function(c){return lt-parseT(c.time)<=30*60000}).forEach(function(c){if(!c.guardId||seen[c.guardId]||lastAt[c.guardId]!==p)return;seen[c.guardId]=1;var g=gInfo(c.guardId);rows.push({g:g.id?g:{name:c.guard,phone:'',photo:c.photo},how:'Seen '+String(c.time).slice(11,16)+(c.role==='control'?' (Control Room)':''),ok:1})});
       /* Once a guard is seen at this gate this shift, show only who is actually there. Roster names only fill in for gates nobody has checked yet. */
-      if(!rows.length)(S.guards||[]).filter(function(g){return g.post===p&&g.shift===sh}).forEach(function(g){rows.push({g:g,how:'Not checked yet · usually here',ok:0})});
+      if(!rows.length)(S.guards||[]).filter(function(g){return g.post===p&&g.shift===sh&&!lastAt[g.id]}).forEach(function(g){rows.push({g:g,how:'Not checked yet · usually here',ok:0})});
       return '<div class="card" style="padding:10px"><b>'+esc(p)+'</b>'+(rows.length?rows.map(function(r){var g=r.g;
         return '<div style="display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:8px">'+(g.photo?miniPh(g.photo,52):'<div style="width:52px;height:52px;border-radius:8px;background:var(--line)"></div>')+
           '<div style="flex:1;min-width:0"><b>'+esc(g.name||'No name')+'</b>'+(g.agency?' <span class="muted" style="font-size:12px">· '+esc(g.agency)+'</span>':'')+'<div><span class="chip '+(r.ok?'grn':'')+'" style="font-size:11px">'+esc(r.how)+'</span></div><div style="font-size:13px">'+phoneLinks(g.phone)+'</div></div>'+

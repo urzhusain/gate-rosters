@@ -274,15 +274,25 @@ function board_(t) {
   checks.sort(function (a, b) { return a.Time < b.Time ? 1 : -1; });
   var posts = rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; });
   var card = function (g, seen) { return { name: g.Name, phone: g.Phone, photo: g.PhotoId, agency: g.Agency, seen: seen || '' }; };
+  /* Who is at a gate now = the guards from that gate's most recent check visit (checks within 30 minutes of the latest one).
+     A guard seen at two gates is shown only at the gate where he was seen last. */
+  var lastAt = {};
+  checks.forEach(function (c) { if (c.GuardId && !lastAt[c.GuardId]) lastAt[c.GuardId] = c.Post; });
+  var shown = {};
   var out = posts.map(function (p) {
-    var seen = {}, list = [];
-    checks.filter(function (c) { return c.Post === p; }).forEach(function (c) {
-      if (!c.GuardId || seen[c.GuardId]) return; seen[c.GuardId] = 1;
-      var g = byId[c.GuardId]; if (g) list.push(card(g, String(c.Time).slice(11, 16)));
-    });
-    var checked = list.length > 0;
-    if (!checked) guards.filter(function (g) { return g.RegularPost === p && g.RegularShift === shift; }).forEach(function (g) { list.push(card(g, '')); });
-    return { post: p, checked: checked, guards: list };
+    var mine = checks.filter(function (c) { return c.Post === p; }), list = [], seen = {};
+    if (mine.length) {
+      var latest = ts_(mine[0].Time);
+      mine.filter(function (c) { return latest - ts_(c.Time) <= 30 * 60000; }).forEach(function (c) {
+        if (!c.GuardId || seen[c.GuardId] || lastAt[c.GuardId] !== p) return; seen[c.GuardId] = 1;
+        var g = byId[c.GuardId]; if (g) { list.push(card(g, String(c.Time).slice(11, 16))); shown[c.GuardId] = 1; }
+      });
+    }
+    return { post: p, checked: list.length > 0, moved: mine.length > 0 && !list.length, guards: list };
+  });
+  out.forEach(function (o) {
+    if (o.checked) return;
+    guards.filter(function (g) { return g.RegularPost === o.post && g.RegularShift === shift && !shown[g.ID] && !lastAt[g.ID]; }).forEach(function (g) { o.guards.push(card(g, '')); });
   });
   return { ok: true, shift: shift, updated: nowS, gates: out };
 }

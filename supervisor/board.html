@@ -186,8 +186,8 @@ img[decoding]{opacity:0;transition:opacity .35s}img[decoding].ld{opacity:1}
     if(phone.matches){
       $('#grid').innerHTML=gates.length?'<div class="glist">'+gates.map(function(o){var g=o.g,gs=g.guards;
         return '<button class="gr" data-g="'+o.i+'"><span class="av'+(gs.length<2?' one':'')+'">'+(gs.length?gs.slice(0,2).map(function(x){return img(x.photo,200)}).join(''):'<div class="ph"></div>')+'</span>'+
-          '<span class="t"><b>'+esc(g.post)+'</b><small>'+(gs.length?gs.map(function(x){return esc(x.name)}).join(', '):'Nobody listed')+'</small></span>'+
-          '<span class="r"><i class="d'+(g.checked?'':' no')+'"></i>'+(g.checked?esc(gs[0]&&gs[0].seen||''):'Not yet')+'<span class="chev">›</span></span></button>'}).join('')+'</div>':'<div class="empty">No gate or name matches.</div>';
+          '<span class="t"><b>'+esc(g.post)+'</b><small>'+(gs.length?gs.map(function(x){return esc(x.name)}).join(', '):g.moved?'Guard moved to another gate':'Nobody listed')+'</small></span>'+
+          '<span class="r"><i class="d'+(g.checked?'':' no')+'"></i>'+(g.checked?esc(gs[0]&&gs[0].seen||''):g.moved?'Recheck':'Not yet')+'<span class="chev">›</span></span></button>'}).join('')+'</div>':'<div class="empty">No gate or name matches.</div>';
       [].forEach.call(document.querySelectorAll('.gr'),function(b){b.onclick=function(){openGate(+b.dataset.g)}});
       return;
     }
@@ -195,7 +195,7 @@ img[decoding]{opacity:0;transition:opacity .35s}img[decoding].ld{opacity:1}
       return '<button class="tile" data-g="'+o.i+'"><span class="cnt">'+gs.length+'</span><h2>'+esc(g.post)+'</h2>'+
         '<div class="av">'+(gs.length?gs.slice(0,4).map(function(x){return img(x.photo,200)}).join(''):'<div class="ph"></div>')+'</div>'+
         '<div class="nm">'+(gs.length?gs.map(function(x){return '<b>'+esc(String(x.name).split(' ')[0])+'</b>'}).join(', '):'Nobody listed')+'</div>'+
-        (g.checked?'<span class="stt ok">● Seen '+esc(gs[0]&&gs[0].seen||'')+'</span>':'<span class="stt no">Not checked yet</span>')+
+        (g.checked?'<span class="stt ok">● Seen '+esc(gs[0]&&gs[0].seen||'')+'</span>':'<span class="stt no">'+(g.moved?'Guard moved · recheck':'Not checked yet')+'</span>')+
         (gs.length?'<div class="peek">'+gs.slice(0,3).map(function(x,i){return '<div class="pc" data-pg="'+o.i+'" data-pi="'+i+'">'+img(x.photo,400)+'<b>'+esc(x.name)+'</b><small>'+(x.seen?'Seen '+esc(x.seen):'Usually here')+'</small></div>'}).join('')+'</div>':'')+
       '</button>'}).join(''):'<div class="empty">No gate or name matches.</div>';
     [].forEach.call(document.querySelectorAll('.tile'),function(b){b.addEventListener('mouseenter',function(){var pk=b.querySelector('.peek');if(!pk)return;var bar=document.querySelector('.bar').getBoundingClientRect().bottom;pk.classList.toggle('below',b.getBoundingClientRect().top-bar<230)})});
