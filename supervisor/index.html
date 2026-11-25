@@ -310,7 +310,7 @@ function viewRaise(){
   '<div class="f"><label>How urgent?</label><div class="seg" id="up"><button data-u="Normal" aria-pressed="true">Normal</button><button data-u="Urgent" aria-pressed="false">Urgent</button></div></div>'+
   (cam?'<div class="f"><label>Camera or exact spot (optional)</label><input id="rcam" placeholder="e.g. Camera 12, near Gate 4 parking"></div>':'')+
   '<div class="f"><label>Details</label><textarea id="rd">'+esc(pf.description||'')+'</textarea></div>'+
-  '<div class="f"><label>Photo or screenshot</label><input id="rf" type="file" accept="image/*"'+(cam?'':' capture="environment"')+'></div><div class="err" id="re"></div>'+
+  '<div class="f"><label>Photo or screenshot</label><input id="rf" type="file" accept="image/*" capture="environment">'+(cam?'<input id="rf2" type="file" accept="image/*" style="display:none"><button type="button" class="btn o s" id="rfu" style="margin-top:6px">Upload a saved photo or screenshot instead</button>':'')+'</div><div class="err" id="re"></div>'+
   '<button class="btn" id="rs">'+(cam?'Save report':'Send to Control Room')+'</button></div>';
   var urg=pf.urg==='Urgent'?'Urgent':'Normal';
   [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.setAttribute('aria-pressed',b.dataset.u===urg)});
@@ -318,6 +318,8 @@ function viewRaise(){
   ['#rp','#rc','#rd'].forEach(function(q){$(q).addEventListener('input',saveDraft);$(q).addEventListener('change',saveDraft)});
   [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.onclick=function(){urg=b.dataset.u;[].forEach.call(document.querySelectorAll('[data-u]'),function(x){x.setAttribute('aria-pressed',x===b)});saveDraft()}});
   function fullDesc(){var d=$('#rd').value.trim();if(!cam)return d;var c=($('#rcam')&&$('#rcam').value.trim())||'';return (c?'('+c+') ':'')+d}
+  if($('#rfu'))$('#rfu').onclick=function(){$('#rf2').click()};
+  if($('#rf2'))$('#rf2').onchange=function(){var f=this.files[0];if(!f)return;try{var dt=new DataTransfer();dt.items.add(f);$('#rf').files=dt.files;$('#rf').dispatchEvent(new Event('change',{bubbles:true}));toast('Photo added')}catch(x){toast('Could not add the photo')}};
   $('#rs').onclick=function(){
     var b=this;b.disabled=true;b.textContent='Sending…';
     compress($('#rf').files[0]).then(function(img){window._ri=img;return call('raiseIssue',{post:$('#rp').value,category:$('#rc').value,priority:urg,description:fullDesc(),photo:img})}).then(function(r){
