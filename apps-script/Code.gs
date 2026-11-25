@@ -308,6 +308,12 @@ function board_(t) {
   guards.forEach(function (g) { byId[g.ID] = g; });
   var from = dateAdd_(today_(), -1);
   var checks = rows_('Checks').filter(function (c) { return c.Date >= from && c.Shift === shift && c.Presence !== 'Absent' && ts_(c.Time) >= start; });
+  /* Handover hour: day staff such as bouncers work till 9 pm, night staff till 9 am. A check of them in that hour is the end of
+     their own duty, not the next shift, so leave them out of the current shift's list. */
+  checks = checks.filter(function (c) {
+    var g = byId[c.GuardId], m = clockMin_(c.Time); if (!g || !g.RegularShift || g.RegularShift === shift) return true;
+    return !((shift === 'Night' && m >= 1200 && m < 1260) || (shift === 'Day' && m >= 480 && m < 540));
+  });
   checks.sort(function (a, b) { return a.Time < b.Time ? 1 : -1; });
   var posts = rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; });
   if (ZONES[zone].posts) posts = posts.filter(function (p) { return ZONES[zone].posts.indexOf(p) > -1; });
