@@ -453,8 +453,8 @@ function editGuard(id,done){
 }
 function guardRecord(id){
   var g=gInfo(id);
-  var d=modal('<h2>'+esc(g.name)+' <span class="muted" style="font-size:14px">'+esc(g.id)+'</span></h2>'+(g.share?'<button class="btn o s" id="grs">Share contact card</button>':'')+'<div id="gr" class="muted">Loading 60 days…</div><button class="btn o" id="grc">Close</button>');
-  $('#grc',d).onclick=function(){d.remove()};if($('#grs',d))$('#grs',d).onclick=function(){shareGuard(g)};
+  var d=modal('<h2>'+esc(g.name)+' <span class="muted" style="font-size:14px">'+esc(g.id)+'</span></h2>'+(g.photo?'<div>'+miniPh(g.photo,96)+'</div>':'')+'<div class="row">'+(g.share?'<button class="btn o s" id="grs">Share contact card</button>':'')+(S.role!=='supervisor'?'<button class="btn o s" id="grp">Change photo</button><input id="grf" type="file" accept="image/*" capture="user" style="display:none">':'')+'</div>'+'<div id="gr" class="muted">Loading 60 days…</div><button class="btn o" id="grc">Close</button>');
+  $('#grc',d).onclick=function(){d.remove()};if($('#grs',d))$('#grs',d).onclick=function(){shareGuard(g)};if($('#grp',d)){$('#grp',d).onclick=function(){$('#grf',d).click()};$('#grf',d).onchange=function(){var f=this.files[0];if(!f)return;$('#grp',d).disabled=true;$('#grp',d).textContent='Saving…';compress(f).then(function(img){return call('updateGuard',{id:id,photo:img})}).then(function(r){if(!r.ok){toast(r.error);$('#grp',d).disabled=false;$('#grp',d).textContent='Change photo';return}S.guards=S.guards.map(function(x){return x.id===id?r.guard:x});toast('Photo updated');d.remove();guardRecord(id)})}}
   call('checks',{from:ymd(-59),to:ymd(0)}).then(function(r){
     var box=$('#gr',d);if(!r.ok){box.innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
     var mine=r.checks.filter(function(c){return c.guardId===id}).sort(function(a,b){return (b.date+b.time).localeCompare(a.date+a.time)});

@@ -292,8 +292,10 @@ function updateGuard_(q, by, role) {
   if (q.post !== undefined) upd.RegularPost = String(q.post);
   if (q.phone !== undefined) upd.Phone = String(q.phone).replace(/\D/g, '');
   if (q.status === 'Left' || q.status === 'Active') upd.Status = q.status;
+  if (q.photo) { var pid = photo_(q.photo, 'guard_' + g.ID); if (pid) upd.PhotoId = pid; }
+  if (!Object.keys(upd).length) return { ok: false, error: 'Nothing to change' };
   setCells_('Guards', g._row, upd);
-  addAlert_('guard', 'guard:' + g.ID + ':' + now_(), 'info', by + ' updated ' + g.Name + ': ' + Object.keys(upd).map(function (k) { return k + ' = ' + upd[k]; }).join(', '), 'head');
+  addAlert_('guard', 'guard:' + g.ID + ':' + now_(), 'info', by + ' updated ' + g.Name + ': ' + Object.keys(upd).map(function (k) { return k === 'PhotoId' ? 'new photo' : k + ' = ' + upd[k]; }).join(', '), 'head');
   var ng = rows_('Guards').filter(function (x) { return x.ID === g.ID; })[0];
   return { ok: true, guard: guardOut_(ng) };
 }
