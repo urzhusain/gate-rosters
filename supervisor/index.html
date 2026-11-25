@@ -165,6 +165,27 @@ function compress(file){return new Promise(function(res){
   },true);
 })();
 
+/* ---------- paste a screenshot (computer) ---------- */
+(function(){
+  var pc=window.matchMedia&&matchMedia('(pointer:fine)').matches&&!('ontouchstart' in window);
+  function vis(el){return el&&el.offsetParent!==null}
+  function target(){var l=[].slice.call(document.querySelectorAll('input[type=file][accept^="image"]')).filter(vis);return l[l.length-1]||null}
+  document.addEventListener('paste',function(e){
+    var el=target();if(!el||!e.clipboardData)return;
+    var it=[].slice.call(e.clipboardData.items||[]).filter(function(i){return i.kind==='file'&&/^image\//.test(i.type)})[0];if(!it)return;
+    var b=it.getAsFile();if(!b)return;e.preventDefault();
+    try{var f=new File([b],'screenshot.png',{type:b.type||'image/png',lastModified:Date.now()}),dt=new DataTransfer();dt.items.add(f);el.files=dt.files;el.dispatchEvent(new Event('change',{bubbles:true}));toast('Screenshot added')}catch(x){toast('Could not paste. Use Choose file.')}
+  });
+  if(!pc)return;
+  new MutationObserver(function(){
+    [].forEach.call(document.querySelectorAll('input[type=file][accept^="image"]:not([data-ph])'),function(el){
+      el.setAttribute('data-ph','1');var h=document.createElement('small');h.className='muted';h.style.display='block';h.style.marginTop='4px';
+      h.textContent='On a computer: press Windows + Shift + S, select the camera screen, then press Ctrl + V here. On a phone, this opens the camera.';
+      el.insertAdjacentElement('afterend',h);
+    });
+  }).observe(document.documentElement,{childList:true,subtree:true});
+})();
+
 /* ---------- login ---------- */
 function viewLogin(msg){
   $('#app').innerHTML='<main><div class="hero"><img class="logo-l" src="../assets/logo.png" alt="Siyanat Al Mumtalakat"><img class="logo-d" src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><h1>Security Control</h1><p>Aljamea-tus-Saifiyah</p></div><div class="card"><h2>Sign in</h2>'+
