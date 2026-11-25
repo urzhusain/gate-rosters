@@ -230,7 +230,7 @@ function bootstrap_(role, name) {
   var s = settings_();
   try { alertTick_(); } catch (e) {}
   return {
-    ok: true, role: role, name: name, overdueHours: Number(s.overdue_hours) || 24, rounds: ROUNDS, minCover: Number(s.min_cover) || 0.9,
+    ok: true, role: role, name: name, nightOff: NIGHT_OFF, overdueHours: Number(s.overdue_hours) || 24, rounds: ROUNDS, minCover: Number(s.min_cover) || 0.9,
     posts: rows_('Posts').map(function (r) { return r.Post; }).filter(String),
     guards: rows_('Guards').filter(function (g) { return g.Status !== 'Left'; }).map(guardOut_),
     boardToken: role === 'supervisor' ? '' : boardToken_(''),
@@ -311,6 +311,7 @@ function board_(t) {
   checks.sort(function (a, b) { return a.Time < b.Time ? 1 : -1; });
   var posts = rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; });
   if (ZONES[zone].posts) posts = posts.filter(function (p) { return ZONES[zone].posts.indexOf(p) > -1; });
+  if (shift === 'Night') posts = posts.filter(function (p) { return NIGHT_OFF.indexOf(p) < 0; });
   var card = function (g, seen) { return { name: g.Name, phone: g.Phone, photo: g.PhotoId, agency: g.Agency, seen: seen || '' }; };
   /* Who is at a gate now = every guard seen there this shift (a gate can have several: gate guard, SO, agency supervisor).
      A guard seen at two gates is shown only at the gate where he was seen last. */
@@ -527,10 +528,12 @@ function listChecks_(from, to) {
 var ROUNDS = [
   { id: 'S1', role: 'supervisor', name: 'Morning round', from: '09:00', to: '11:30' },
   { id: 'S2', role: 'supervisor', name: 'Day round (any time)', from: '11:30', to: '19:00' },
-  { id: 'S4', role: 'supervisor', name: 'Night watchmen round (evening)', from: '19:30', to: '21:00' },
+  { id: 'S4', role: 'supervisor', name: 'Night watchmen round (evening)', from: '19:30', to: '21:00', night: true },
   { id: 'C4', role: 'control', name: 'Control Room round (once a day, any time)', from: '00:00', to: '23:59' }
 ];
-function requiredPosts_() { return rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; }); }
+/* Gates with no watchman at night: not expected in night rounds or on the night board. */
+var NIGHT_OFF = ['Gate 2', 'Sarela Makan'];
+function requiredPosts_(night) { if (night) return requiredPosts_().filter(function (p) { return NIGHT_OFF.indexOf(p) < 0; }); return rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; }); }
 function dateAdd_(d, n) { var x = new Date(d + 'T12:00:00+05:30'); x.setDate(x.getDate() + n); return Utilities.formatDate(x, TZ, 'yyyy-MM-dd'); }
 /** Status of every round window on the given dates, newest first. */
 function roundList_(dates, checks, rm) {
@@ -544,9 +547,10 @@ function roundList_(dates, checks, rm) {
         if ((c.Role || roleOfName_(c.By, rm)) !== R.role) return;
         var t = ts_(c.Time); if (t >= st && t <= lim) { posts[c.Post] = 1; if (t > en) late = true; }
       });
-      var got = req.filter(function (p) { return posts[p]; }), status = now < st ? 'upcoming' : now <= en ? 'open' : (got.length >= Math.ceil(req.length * minCover) ? 'done' : (now <= lim ? 'open' : 'missed'));
-      out.push({ id: R.id, role: R.role, name: R.name, date: d, from: R.from, to: R.to, status: status, late: late && status === 'done', done: got.length, total: req.length,
-        missing: req.filter(function (p) { return !posts[p]; }), start: st });
+      var rq = R.night ? req.filter(function (p) { return NIGHT_OFF.indexOf(p) < 0; }) : req;
+      var got = rq.filter(function (p) { return posts[p]; }), status = now < st ? 'upcoming' : now <= en ? 'open' : (got.length >= Math.ceil(rq.length * minCover) ? 'done' : (now <= lim ? 'open' : 'missed'));
+      out.push({ id: R.id, role: R.role, name: R.name, date: d, from: R.from, to: R.to, status: status, late: late && status === 'done', done: got.length, total: rq.length,
+        missing: rq.filter(function (p) { return !posts[p]; }), start: st });
     });
   });
   out.sort(function (a, b) { return b.start - a.start; });
@@ -659,7 +663,7 @@ function digestText_() {
   var nightPosts = {}; all.forEach(function (c) { if (c.Date >= from && c.Shift === 'Night' && c.Post !== 'Control Room') nightPosts[c.Post] = 1; });
   var dayPosts = {}; all.forEach(function (c) { if (c.Date >= from && c.Shift === 'Day' && c.Post !== 'Control Room') dayPosts[c.Post] = 1; });
   var seenPost = function (list, p) { return list.some(function (c) { return c.Post === p; }); };
-  var noDay = req.filter(function (p) { return dayPosts[p] && !seenPost(dayC, p); }), noNight = req.filter(function (p) { return nightPosts[p] && !seenPost(nightC, p); });
+  var noDay = req.filter(function (p) { return dayPosts[p] && !seenPost(dayC, p); }), noNight = req.filter(function (p) { return nightPosts[p] && NIGHT_OFF.indexOf(p) < 0 && !seenPost(nightC, p); });
   var both = dayC.concat(nightC);
   var absent = both.filter(function (c) { return c.Presence === 'Absent'; }), late = both.filter(function (c) { return c.Presence === 'Late'; });
   var newF = both.filter(function (c) { return /NEW GUARD/.test(c.Flags || ''); }), dbl = both.filter(function (c) { return /DOUBLE/.test(c.Flags || ''); });
