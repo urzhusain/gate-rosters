@@ -196,7 +196,9 @@ function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(20000);
-    var q = JSON.parse(e.postData.contents), user = userOf_(q.pin);
+    var q = JSON.parse(e.postData.contents);
+    if (q.action === 'card') return json_(card_(q.t));
+    var user = userOf_(q.pin);
     if (!user) return json_({ ok: false, error: 'Wrong PIN' });
     var role = user.role, by = user.name;
     switch (q.action) {
@@ -231,7 +233,34 @@ function bootstrap_(role, name) {
   };
 }
 function guardOut_(g) {
-  return { id: g.ID, name: g.Name, phone: g.Phone, photo: g.PhotoId, post: g.RegularPost, shift: g.RegularShift, agency: g.Agency };
+  return { id: g.ID, name: g.Name, phone: g.Phone, photo: g.PhotoId, post: g.RegularPost, shift: g.RegularShift, agency: g.Agency, share: shareToken_(g.ID) };
+}
+/* ---- Share link for one guard: an unguessable token, so one link shows only that guard. ---- */
+var SHARE_SECRET_ = null;
+function shareSecret_() {
+  if (SHARE_SECRET_) return SHARE_SECRET_;
+  var s = settings_().share_secret;
+  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); setSetting_('share_secret', s); }
+  return (SHARE_SECRET_ = s);
+}
+function shareToken_(id) {
+  if (!id) return '';
+  var b = Utilities.computeHmacSha256Signature(String(id), shareSecret_());
+  return Utilities.base64EncodeWebSafe(b).replace(/=+$/, '').slice(0, 18);
+}
+/** Public: no PIN. Returns only name, photo, phone, gate, shift and agency of the one guard the link is for. */
+function card_(t) {
+  t = String(t || '').trim();
+  if (t.length < 12) return { ok: false, error: 'This link is not valid.' };
+  var gs = rows_('Guards');
+  for (var i = 0; i < gs.length; i++) {
+    var g = gs[i];
+    if (shareToken_(g.ID) === t) {
+      if (g.Status === 'Left') return { ok: false, error: 'This watchman is no longer on duty here.' };
+      return { ok: true, card: { name: g.Name, phone: g.Phone, photo: g.PhotoId, post: g.RegularPost, shift: g.RegularShift, agency: g.Agency } };
+    }
+  }
+  return { ok: false, error: 'This link is not valid.' };
 }
 
 function addGuard_(q, by, role) {

@@ -187,6 +187,38 @@ function compress(file){return new Promise(function(res){
   }).observe(document.documentElement,{childList:true,subtree:true});
 })();
 
+/* ---------- On duty now (watchmen, supervisor, Control Room) ---------- */
+var CARD_URL='https://urzhusain.github.io/gate-rosters/supervisor/card.html?t=';
+function shareGuard(g){
+  var url=CARD_URL+encodeURIComponent(g.share),txt=g.name+(g.post?' · '+g.post:'')+(g.shift?' ('+g.shift+' shift)':'')+'\n'+url;
+  if(navigator.share){navigator.share({title:g.name,text:g.name+(g.post?' · '+g.post:''),url:url}).catch(function(){});return}
+  window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank','noopener');
+}
+function openOnDuty(){
+  var sh=defShift(),now=new Date(),P=(window.SUP_CONFIG||{}).profiles||{},cw=(window.SUP_CONFIG||{}).controlWhatsapp;
+  var d=modal('<h2>On duty now · '+sh+' shift</h2><div id="odl" class="muted">Loading…</div><button class="btn o" id="odx">Close</button>');
+  $('#odx',d).onclick=function(){d.remove()};
+  var staff=function(k,role,ph){var p=P[k];if(!p)return '';return '<div class="card" style="flex-direction:row;align-items:center;gap:12px;padding:10px"><img src="'+esc(p.photo)+'" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)"><div><b>'+esc(p.name)+'</b><div class="muted" style="font-size:13px">'+esc(role)+'</div>'+(ph?'<div style="font-size:14px">'+phoneLinks(ph)+'</div>':'')+'</div></div>'};
+  Promise.all([call('bootstrap'),call('checks',{from:ymd(-1),to:ymd(0)})]).then(function(rs){
+    if(rs[0].ok&&rs[0].guards)S.guards=rs[0].guards;
+    var cs=rs[1].ok?rs[1].checks:[];
+    var st=new Date(now);if(sh==='Day'){st.setHours(8,0,0,0)}else{if(now.getHours()<8)st.setDate(st.getDate()-1);st.setHours(20,0,0,0)}
+    var inShift=cs.filter(function(c){return c.shift===sh&&parseT(c.time)>=st&&c.presence!=='Absent'});
+    var html=staff('supervisor','Supervisor','')+staff('control','Control Room',cw)+
+      '<div class="muted" style="font-size:13px">Seen = checked on post this shift. Roster = expected, not checked yet. Tap Share to send a watchman\'s card (name, photo, phone) as a link.</div>';
+    html+=(S.posts||[]).map(function(p){
+      var seen={},rows=[];
+      inShift.filter(function(c){return c.post===p}).forEach(function(c){if(!c.guardId||seen[c.guardId])return;seen[c.guardId]=1;var g=gInfo(c.guardId);rows.push({g:g.id?g:{name:c.guard,phone:'',photo:c.photo},how:'Seen '+String(c.time).slice(11,16)+(c.role==='control'?' (Control Room)':''),ok:1})});
+      (S.guards||[]).filter(function(g){return g.post===p&&g.shift===sh&&!seen[g.id]}).forEach(function(g){rows.push({g:g,how:'Roster · not checked yet',ok:0})});
+      return '<div class="card" style="padding:10px"><b>'+esc(p)+'</b>'+(rows.length?rows.map(function(r){var g=r.g;
+        return '<div style="display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:8px">'+(g.photo?miniPh(g.photo,52):'<div style="width:52px;height:52px;border-radius:8px;background:var(--line)"></div>')+
+          '<div style="flex:1;min-width:0"><b>'+esc(g.name||'No name')+'</b>'+(g.agency?' <span class="muted" style="font-size:12px">· '+esc(g.agency)+'</span>':'')+'<div><span class="chip '+(r.ok?'grn':'')+'" style="font-size:11px">'+esc(r.how)+'</span></div><div style="font-size:13px">'+phoneLinks(g.phone)+'</div></div>'+
+          (g.share?'<button class="btn o s" data-sg="'+esc(g.id)+'">Share</button>':'')+'</div>'}).join(''):'<div class="muted">Nobody seen or on the roster for this shift.</div>')+'</div>'}).join('');
+    $('#odl',d).outerHTML='<div id="odl" style="display:flex;flex-direction:column;gap:10px">'+html+'</div>';
+    [].forEach.call(d.querySelectorAll('[data-sg]'),function(b){b.onclick=function(){var g=gInfo(b.dataset.sg);if(g.share)shareGuard(g)}});
+  });
+}
+
 /* ---------- login ---------- */
 function viewLogin(msg){
   $('#app').innerHTML='<main><div class="hero"><img class="logo-l" src="../assets/logo.png" alt="Siyanat Al Mumtalakat"><img class="logo-d" src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><h1>Security Control</h1><p>Aljamea-tus-Saifiyah</p></div><div class="card"><h2>Sign in</h2>'+
@@ -213,9 +245,9 @@ function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:
 function main(){
   if(S.tab!=='issues')S.icat=null;
   var tabs=tabsFor();
-  $('#app').innerHTML='<div class="top"><div class="brand"><img src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><div><b>Security Control</b><small>'+(S.name===roleName()?esc(S.name):esc(S.name)+' · '+roleName())+'</small></div></div><button id="lo">Sign out</button></div><main id="mn"></main>'+
+  $('#app').innerHTML='<div class="top"><div class="brand"><img src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><div><b>Security Control</b><small>'+(S.name===roleName()?esc(S.name):esc(S.name)+' · '+roleName())+'</small></div></div><span style="display:flex;gap:6px"><button id="odb">On duty</button><button id="lo">Sign out</button></span></div><main id="mn"></main>'+
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
-  $('#lo').onclick=logout;
+  $('#lo').onclick=logout;$('#odb').onclick=openOnDuty;
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
   var v={home:viewHome,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster}[S.tab];$('#mn').classList.remove('wide');v();
 }
@@ -421,8 +453,8 @@ function editGuard(id,done){
 }
 function guardRecord(id){
   var g=gInfo(id);
-  var d=modal('<h2>'+esc(g.name)+' <span class="muted" style="font-size:14px">'+esc(g.id)+'</span></h2><div id="gr" class="muted">Loading 60 days…</div><button class="btn o" id="grc">Close</button>');
-  $('#grc',d).onclick=function(){d.remove()};
+  var d=modal('<h2>'+esc(g.name)+' <span class="muted" style="font-size:14px">'+esc(g.id)+'</span></h2>'+(g.share?'<button class="btn o s" id="grs">Share contact card</button>':'')+'<div id="gr" class="muted">Loading 60 days…</div><button class="btn o" id="grc">Close</button>');
+  $('#grc',d).onclick=function(){d.remove()};if($('#grs',d))$('#grs',d).onclick=function(){shareGuard(g)};
   call('checks',{from:ymd(-59),to:ymd(0)}).then(function(r){
     var box=$('#gr',d);if(!r.ok){box.innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
     var mine=r.checks.filter(function(c){return c.guardId===id}).sort(function(a,b){return (b.date+b.time).localeCompare(a.date+a.time)});
