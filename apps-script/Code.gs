@@ -199,12 +199,13 @@ function doPost(e) {
     var q = JSON.parse(e.postData.contents);
     if (q.action === 'card') return json_(card_(q.t));
     if (q.action === 'board') return json_(board_(q.t));
+    if (q.action === 'boardReport') return json_(boardReport_(q));
     var user = userOf_(q.pin);
     if (!user) return json_({ ok: false, error: 'Wrong PIN' });
     var role = user.role, by = user.name;
     switch (q.action) {
       case 'bootstrap': return json_(bootstrap_(role, by));
-      case 'resetBoard': return json_(resetBoard_(role));
+      case 'resetBoard': return json_(resetBoard_(role, q));
       case 'addGuard': return json_(addGuard_(q, by, role));
       case 'updateGuard': return json_(updateGuard_(q, by, role));
       case 'rounds': return json_(roundsOut_(role, q));
@@ -232,7 +233,8 @@ function bootstrap_(role, name) {
     ok: true, role: role, name: name, overdueHours: Number(s.overdue_hours) || 24, rounds: ROUNDS, minCover: Number(s.min_cover) || 0.9,
     posts: rows_('Posts').map(function (r) { return r.Post; }).filter(String),
     guards: rows_('Guards').filter(function (g) { return g.Status !== 'Left'; }).map(guardOut_),
-    boardToken: role === 'supervisor' ? '' : boardToken_()
+    boardToken: role === 'supervisor' ? '' : boardToken_(''),
+    boardLinks: role === 'supervisor' ? [] : boardLinks_()
   };
 }
 function guardOut_(g) {
@@ -252,18 +254,53 @@ function shareToken_(id) {
   return Utilities.base64EncodeWebSafe(b).replace(/=+$/, '').slice(0, 18);
 }
 /* ---- Live "on duty" board: one secret link shows every gate and who is on duty this shift. Head Office can reset the link. ---- */
-function boardToken_() {
-  var t = settings_().board_token;
-  if (!t) { t = Utilities.getUuid().replace(/-/g, '').slice(0, 20); setSetting_('board_token', t); }
+/* Zones: a link that shows only some gates, for that area's in-charge. '' = all gates. */
+var ZONES = {
+  '': { name: 'All gates', posts: null },
+  masakin: { name: 'Masakin Zone', posts: ['Masakin front gate', 'Masakin back gate', 'Raj Manzil', 'Yusufi Makan'] }
+};
+function boardToken_(zone) {
+  var k = 'board_token' + (zone ? '_' + zone : ''), t = settings_()[k];
+  if (!t) { t = Utilities.getUuid().replace(/-/g, '').slice(0, 20); setSetting_(k, t); }
   return t;
 }
-function resetBoard_(role) {
+function boardLinks_() {
+  return Object.keys(ZONES).map(function (z) { return { zone: z, name: ZONES[z].name, token: boardToken_(z) }; });
+}
+function zoneOfToken_(t) {
+  t = String(t || ''); if (!t) return null;
+  var zs = Object.keys(ZONES);
+  for (var i = 0; i < zs.length; i++) if (boardToken_(zs[i]) === t) return zs[i];
+  return null;
+}
+function resetBoard_(role, q) {
   if (role !== 'head') return { ok: false, error: 'Only Head Office can reset the link' };
-  var t = Utilities.getUuid().replace(/-/g, '').slice(0, 20); setSetting_('board_token', t);
-  return { ok: true, boardToken: t };
+  var z = String((q && q.zone) || ''); if (!ZONES[z]) return { ok: false, error: 'Unknown zone' };
+  var t = Utilities.getUuid().replace(/-/g, '').slice(0, 20); setSetting_('board_token' + (z ? '_' + z : ''), t);
+  return { ok: true, boardToken: t, boardLinks: boardLinks_() };
+}
+/** Public report from the shared board link: the person must give a name; a photo is required. */
+var REPORT_CATS = ['Guard sleeping / away from post', 'Guard absent', 'Uniform / dress', 'Complaint about guard', 'Other'];
+function boardReport_(q) {
+  var z = zoneOfToken_(q.t);
+  if (z === null) return { ok: false, error: 'This link is not valid or has been reset.' };
+  var posts = ZONES[z].posts, post = String(q.post || '');
+  if (posts && posts.indexOf(post) < 0) return { ok: false, error: 'This gate is not in your zone.' };
+  var name = String(q.name || '').trim().slice(0, 60), ph = String(q.phone || '').replace(/\D/g, '').slice(0, 13);
+  if (name.length < 3) return { ok: false, error: 'Please write your name.' };
+  if (!q.photo) return { ok: false, error: 'Please take a photo.' };
+  var cat = REPORT_CATS.indexOf(q.category) > -1 ? q.category : 'Other';
+  var cache = CacheService.getScriptCache(), n = Number(cache.get('brep') || 0);
+  if (n >= 30) return { ok: false, error: 'Too many reports in the last hour. Please call the Control Room.' };
+  cache.put('brep', String(n + 1), 3600);
+  var who = name + (ph ? ' (' + ph + ')' : '') + ' · via ' + ZONES[z].name + ' link';
+  var desc = (q.guard ? 'Watchman: ' + String(q.guard).slice(0, 60) + '. ' : '') + String(q.description || '').trim();
+  if (desc.length < 3) desc = cat;
+  return raiseIssue_({ post: post, category: cat, priority: q.priority === 'Urgent' ? 'Urgent' : 'Normal', description: desc, photo: q.photo }, who, 'admin');
 }
 function board_(t) {
-  if (!t || String(t) !== boardToken_()) return { ok: false, error: 'This link is not valid or has been reset.' };
+  var zone = zoneOfToken_(t);
+  if (zone === null) return { ok: false, error: 'This link is not valid or has been reset.' };
   var now = new Date(), nowS = now_(), h = Number(nowS.slice(11, 13)), shift = (h >= 8 && h < 20) ? 'Day' : 'Night';
   var startD = shift === 'Day' ? today_() : (h < 8 ? dateAdd_(today_(), -1) : today_());
   var start = ts_(startD + ' ' + (shift === 'Day' ? '08:00:00' : '20:00:00'));
@@ -273,8 +310,9 @@ function board_(t) {
   var checks = rows_('Checks').filter(function (c) { return c.Date >= from && c.Shift === shift && c.Presence !== 'Absent' && ts_(c.Time) >= start; });
   checks.sort(function (a, b) { return a.Time < b.Time ? 1 : -1; });
   var posts = rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; });
+  if (ZONES[zone].posts) posts = posts.filter(function (p) { return ZONES[zone].posts.indexOf(p) > -1; });
   var card = function (g, seen) { return { name: g.Name, phone: g.Phone, photo: g.PhotoId, agency: g.Agency, seen: seen || '' }; };
-  /* Who is at a gate now = the guards from that gate's most recent check visit (checks within 30 minutes of the latest one).
+  /* Who is at a gate now = every guard seen there this shift (a gate can have several: gate guard, SO, agency supervisor).
      A guard seen at two gates is shown only at the gate where he was seen last. */
   var lastAt = {};
   checks.forEach(function (c) { if (c.GuardId && !lastAt[c.GuardId]) lastAt[c.GuardId] = c.Post; });
@@ -282,8 +320,7 @@ function board_(t) {
   var out = posts.map(function (p) {
     var mine = checks.filter(function (c) { return c.Post === p; }), list = [], seen = {};
     if (mine.length) {
-      var latest = ts_(mine[0].Time);
-      mine.filter(function (c) { return latest - ts_(c.Time) <= 30 * 60000; }).forEach(function (c) {
+      mine.forEach(function (c) {
         if (!c.GuardId || seen[c.GuardId] || lastAt[c.GuardId] !== p) return; seen[c.GuardId] = 1;
         var g = byId[c.GuardId]; if (g) { list.push(card(g, String(c.Time).slice(11, 16))); shown[c.GuardId] = 1; }
       });
@@ -294,7 +331,7 @@ function board_(t) {
     if (o.checked) return;
     guards.filter(function (g) { return g.RegularPost === o.post && g.RegularShift === shift && !shown[g.ID] && !lastAt[g.ID]; }).forEach(function (g) { o.guards.push(card(g, '')); });
   });
-  return { ok: true, shift: shift, updated: nowS, gates: out };
+  return { ok: true, shift: shift, updated: nowS, zone: ZONES[zone].name, all: !ZONES[zone].posts, reportCats: REPORT_CATS, gates: out };
 }
 /** Public: no PIN. Returns only name, photo, phone, gate, shift and agency of the one guard the link is for. */
 function card_(t) {

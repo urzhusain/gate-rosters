@@ -130,6 +130,28 @@ img[decoding]{opacity:0;transition:opacity .35s}img[decoding].ld{opacity:1}
   .act{padding:10px}
   footer{padding:0 24px 24px}
 }
+
+.rep{display:block;width:100%;margin-top:12px;background:var(--card);border-radius:14px;padding:14px;color:#FF3B30;font-weight:600;font-size:17px;text-align:center}
+.rep:active{background:var(--fill)}
+.fm{background:var(--card);border-radius:14px;overflow:hidden;margin-top:8px}
+.fm label{display:block;padding:10px 14px;position:relative}
+.fm label+label:before{content:"";position:absolute;top:0;left:14px;right:0;border-top:.5px solid var(--sep)}
+.fm small{display:block;color:var(--mute);font-size:13px;margin-bottom:2px}
+.fm input,.fm textarea{width:100%;border:0;background:transparent;font:inherit;font-size:17px;color:var(--fg);outline:none;padding:2px 0;-webkit-user-select:text;user-select:text}
+.fm textarea{min-height:64px;resize:vertical}
+.chips2{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chips2 button{background:var(--card);border-radius:999px;padding:8px 14px;font-size:15px;font-weight:500}
+.chips2 button.on{background:var(--blue);color:#fff}
+.shot{margin-top:8px;background:var(--card);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;color:var(--blue);font-weight:600;font-size:17px;width:100%}
+.shot img{width:64px;height:64px;border-radius:10px;object-fit:cover;opacity:1}
+.urg{display:flex;justify-content:space-between;align-items:center;background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px}
+.sw{width:51px;height:31px;border-radius:16px;background:var(--fill);position:relative;transition:background .2s;flex:none}
+.sw:after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .2s}
+.sw.on{background:#FF3B30}.sw.on:after{transform:translateX(20px)}
+.send{display:block;width:100%;margin-top:14px;background:var(--blue);color:#fff;border-radius:14px;padding:15px;font-size:17px;font-weight:600}
+.send:disabled{opacity:.5}
+.ferr{color:#FF3B30;font-size:14px;margin-top:8px;text-align:center;min-height:18px}
+.done{text-align:center;padding:30px 10px}.done .ok{width:72px;height:72px;border-radius:50%;background:var(--green);color:#fff;font-size:40px;display:grid;place-items:center;margin:0 auto 12px}
 </style></head><body>
 <div class="bar" id="bar"><div class="tt">On Duty</div><div class="wrap"><div class="big">
   <div class="brand"><img src="../assets/icon-180.png" alt="">Aljamea-tus-Saifiyah · Security</div>
@@ -171,14 +193,45 @@ img[decoding]{opacity:0;transition:opacity .35s}img[decoding].ld{opacity:1}
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll()});
   function openGate(gi){var g=D.gates[gi];stack=[gi];
     open('<div class="shh"><h3>'+esc(g.post)+'</h3><button class="x" aria-label="Close">✕</button></div><div style="margin-bottom:10px">'+(g.checked?'<span class="stt ok">● Checked this shift</span>':'<span class="stt no">Not checked yet · usually here</span>')+'</div>'+
-      (g.guards.length?'<div class="list">'+g.guards.map(function(x,i){return '<button class="row" data-gi="'+gi+'" data-i="'+i+'">'+img(x.photo,200)+'<span class="t"><b>'+esc(x.name)+'</b><small>'+esc(x.agency||'')+(x.seen?' · seen '+esc(x.seen):'')+'</small></span><span class="chev">›</span></button>'}).join('')+'</div>':'<div class="empty">No watchman listed for this gate.</div>'));
+      (g.guards.length?'<div class="list">'+g.guards.map(function(x,i){return '<button class="row" data-gi="'+gi+'" data-i="'+i+'">'+img(x.photo,200)+'<span class="t"><b>'+esc(x.name)+'</b><small>'+esc(x.agency||'')+(x.seen?' · seen '+esc(x.seen):'')+'</small></span><span class="chev">›</span></button>'}).join('')+'</div>':'<div class="empty">No watchman listed for this gate.</div>')+'<button class="rep" id="rpg">Report a problem at this gate</button>');
+    $('#rpg').onclick=function(){openReport(gi,null)};
     [].forEach.call($('#sheet').querySelectorAll('[data-i]'),function(b){b.onclick=function(){openGuard(+b.dataset.gi,+b.dataset.i)}})}
-  function openGuard(gi,i){var g=D.gates[gi],x=g.guards[i];openCard({name:x.name,role:'Watchman · '+g.post,photo:x.photo,phone:x.phone,agency:x.agency,seen:x.seen,back:gi})}
+  function openGuard(gi,i){var g=D.gates[gi],x=g.guards[i];openCard({name:x.name,role:'Watchman · '+g.post,photo:x.photo,phone:x.phone,agency:x.agency,seen:x.seen,back:gi,gi:gi,guard:x.name})}
   function openCard(c){var n=num(c.phone);
     open('<div class="shh">'+(c.back!=null?'<button id="bk" style="color:var(--blue);font-size:17px">‹ '+esc(D.gates[c.back].post)+'</button>':'<span></span>')+'<button class="x" aria-label="Close">✕</button></div>'+
       '<div class="cc">'+(c.photoUrl?'<img alt="" src="'+esc(c.photoUrl)+'">':img(c.photo,600))+'<h3>'+esc(c.name)+'</h3><div class="m">'+esc(c.role)+(c.agency?' · '+esc(c.agency):'')+'</div>'+(c.seen!==undefined?'<div style="margin-top:10px">'+stt(c)+'</div>':'')+'</div>'+
       (n?'<div class="acts"><a class="act" href="tel:+'+n+'">'+IC.call+'Call</a><a class="act" href="https://wa.me/'+n+'" target="_blank" rel="noopener">'+IC.wa+'WhatsApp</a></div><div class="num"><small>mobile</small><a href="tel:+'+n+'">+'+esc(n)+'</a></div>':'<div class="empty" style="padding:16px">No phone number saved.</div>'));
+    if(c.guard){$('#sheet').insertAdjacentHTML('beforeend','<button class="rep" id="rpw">Report a problem with this watchman</button>');$('#rpw').onclick=function(){openReport(c.gi,c.guard)}}
     var bk=$('#bk');if(bk)bk.onclick=function(){openGate(c.back)}}
+  /* ---------- report a problem (name and photo required) ---------- */
+  function shrink(file){return new Promise(function(res){if(!file)return res('');var u=URL.createObjectURL(file),im=new Image();im.onload=function(){var m=1000,k=Math.min(1,m/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*k);c.height=Math.round(im.naturalHeight*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.8))};im.onerror=function(){res('')};im.src=u})}
+  function openReport(gi,guard){
+    var g=D.gates[gi],cats=D.reportCats||['Guard sleeping / away from post','Guard absent','Uniform / dress','Complaint about guard','Other'];
+    var lab={'Guard sleeping / away from post':'Sleeping / away','Guard absent':'Not available','Uniform / dress':'Dress / uniform','Complaint about guard':'Complaint','Other':'Other'};
+    var me={};try{me=JSON.parse(localStorage.getItem('reporter')||'{}')}catch(e){}
+    open('<div class="shh"><button id="rbk" style="color:var(--blue);font-size:17px">‹ Back</button><button class="x" aria-label="Close">✕</button></div>'+
+      '<h3 style="margin:2px 0 2px;font-size:24px;font-weight:800">Report a problem</h3><div style="color:var(--mute);font-size:15px">'+esc(g.post)+(guard?' · '+esc(guard):'')+'</div>'+
+      '<div class="sec" style="margin:16px 4px 6px">What is the problem?</div><div class="chips2">'+cats.map(function(c,i){return '<button data-c="'+esc(c)+'"'+(i===0?' class="on"':'')+'>'+esc(lab[c]||c)+'</button>'}).join('')+'</div>'+
+      '<label class="shot" id="shl"><input id="rph" type="file" accept="image/*" capture="environment" hidden><span id="shi">📷</span><span id="sht">Take a photo (required)</span></label>'+
+      '<div class="fm"><label><small>Details (optional)</small><textarea id="rds" placeholder="What did you see?"></textarea></label></div>'+
+      '<div class="urg"><span>Urgent</span><button class="sw" id="rug" aria-label="Urgent"></button></div>'+
+      '<div class="sec" style="margin:16px 4px 6px">Your details</div><div class="fm"><label><small>Your name (required)</small><input id="rnm" autocomplete="name" value="'+esc(me.name||'')+'"></label><label><small>Your phone (optional)</small><input id="rpn" inputmode="tel" autocomplete="tel" value="'+esc(me.phone||'')+'"></label></div>'+
+      '<div class="ferr" id="rer"></div><button class="send" id="rsd">Send to Control Room</button>');
+    var cat=cats[0],urg=false;
+    [].forEach.call($('#sheet').querySelectorAll('[data-c]'),function(b){b.onclick=function(){cat=b.dataset.c;[].forEach.call($('#sheet').querySelectorAll('[data-c]'),function(x){x.classList.toggle('on',x===b)})}});
+    $('#rug').onclick=function(){urg=!urg;this.classList.toggle('on',urg)};
+    $('#rph').onchange=function(){var f=this.files[0];if(!f)return;$('#shi').innerHTML='<img alt="" src="'+URL.createObjectURL(f)+'">';$('#sht').textContent='Photo added · tap to retake'};
+    $('#rbk').onclick=function(){guard?openGuard(gi,g.guards.map(function(x){return x.name}).indexOf(guard)):openGate(gi)};
+    $('#rsd').onclick=function(){var b=this,nm=$('#rnm').value.trim(),pn=$('#rpn').value.trim(),f=$('#rph').files[0];
+      if(!f){$('#rer').textContent='Please take a photo first.';return}
+      if(nm.length<3){$('#rer').textContent='Please write your name, so the Control Room knows who reported it.';return}
+      try{localStorage.setItem('reporter',JSON.stringify({name:nm,phone:pn}))}catch(e){}
+      b.disabled=true;b.textContent='Sending…';$('#rer').textContent='';
+      shrink(f).then(function(img){return fetch(SUP_CONFIG.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'boardReport',t:T,post:g.post,guard:guard||'',category:cat,priority:urg?'Urgent':'Normal',description:$('#rds').value,name:nm,phone:pn,photo:img})})}).then(function(r){return r.json()}).then(function(r){
+        if(!r.ok){b.disabled=false;b.textContent='Send to Control Room';$('#rer').textContent=r.error||'Could not send. Try again.';return}
+        open('<div class="shh"><span></span><button class="x" aria-label="Close">✕</button></div><div class="done"><div class="ok">✓</div><h3 style="margin:0 0 6px;font-size:22px">Sent to Control Room</h3><div style="color:var(--mute)">Report '+esc(r.id)+' · '+esc(g.post)+'<br>The Control Room has been alerted.</div></div>');
+      }).catch(function(){b.disabled=false;b.textContent='Send to Control Room';$('#rer').textContent='No connection. Try again.'})}
+  }
   /* render */
   function render(){
     var q=($('#q').value||'').trim().toLowerCase(),gates=D.gates.map(function(g,i){return {g:g,i:i}}).filter(function(o){return !q||o.g.post.toLowerCase().indexOf(q)>-1||o.g.guards.some(function(x){return String(x.name).toLowerCase().indexOf(q)>-1})});
@@ -218,6 +271,7 @@ img[decoding]{opacity:0;transition:opacity .35s}img[decoding].ld{opacity:1}
     if(!T){$('#grid').innerHTML='<div class="err">This link is not valid.</div>';$('#meta').textContent='';return}
     fetch(SUP_CONFIG.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'board',t:T})}).then(function(r){return r.json()}).then(function(r){
       if(!r.ok){$('#grid').innerHTML='<div class="err">'+esc(r.error||'Not available')+'</div>';$('#meta').textContent='';return}
+      if(r.zone&&!r.all){document.querySelector('h1').textContent=r.zone;document.querySelector('.tt').textContent=r.zone;document.title=r.zone+' · On Duty'}
       D=r;try{localStorage.setItem('board_'+T,JSON.stringify(r))}catch(e){}$('#meta').textContent=r.shift+' shift · updated '+String(r.updated).slice(11,16);if(!$('#sheet').classList.contains('on'))render();
     }).catch(function(){$('#meta').textContent='No connection. Retrying…'});
   }
