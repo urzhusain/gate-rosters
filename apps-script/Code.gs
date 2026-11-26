@@ -52,8 +52,28 @@ function roleOfName_(name, map) {
 function roleMap_() {
   var o = {}; rows_('Users').forEach(function (u) { o[String(u.Name).trim().toLowerCase()] = String(u.Role).trim().toLowerCase(); }); return o;
 }
-function doubleDutyMsg_(g, time) {
-  return 'DOUBLE DUTY: ' + g.Name + ' is registered for the ' + g.RegularShift + ' shift but was on post at ' + String(time).slice(11, 16).replace(/^(\d):/, '0$1:') + ' (' + shiftByClock_(time) + ' hours).';
+function isAbsent_(p) { return /^(Absent|अनुपस्थित)$/.test(String(p || '')); }
+/** Start time (ms) of the shift a check belongs to. Night runs 8 PM to 8 AM, so a night check before noon belongs to the previous date's night. */
+function shiftStart_(c) {
+  var d = c.Date, x = clockMin_(c.Time);
+  if (c.Shift === 'Night') { if (x >= 0 && x < 720) d = dayBefore_(d); return ts_(d + ' 20:00:00'); }
+  return ts_(d + ' 08:00:00');
+}
+function hm_(t) { return String(t).slice(11, 16).replace(/^(\d):/, '0$1:'); }
+/** Double duty = the guard was ALSO on post in the shift just before this one (night then day, or day then night).
+ *  Working a different shift from his registered one, with the previous shift off, is only a shift change. */
+function dutyFlag_(g, c, all) {
+  if (!g || isAbsent_(c.Presence)) return '';
+  var start = shiftStart_(c), prev = start - 12 * 3600 * 1000;
+  for (var i = all.length - 1; i >= 0; i--) {
+    var p = all[i];
+    if (p.GuardId !== g.ID || isAbsent_(p.Presence) || p.Time === c.Time) continue;
+    if (shiftStart_(p) === prev)
+      return 'DOUBLE DUTY: ' + g.Name + ' was also on post in the previous ' + p.Shift + ' shift (' + p.Post + ', ' + String(p.Date).slice(5) + ' at ' + hm_(p.Time) + ') and is on post again in this ' + c.Shift + ' shift.';
+  }
+  if (g.RegularShift && g.RegularShift !== c.Shift)
+    return 'SHIFT CHANGE: ' + g.Name + ' is registered for the ' + g.RegularShift + ' shift but is on the ' + c.Shift + ' shift now. He was not on post in the shift before, so this is not double duty. If this is his new shift, the Control Room should update it.';
+  return '';
 }
 /** Run once from the editor: adds the new columns, creates the Alerts sheet, seeds each guard\'s shift and agency, repairs old flags. */
 function migrate() {
@@ -85,11 +105,12 @@ function migrate() {
 function repairFlags() {
   var ss = ss_(), sh = ss.getSheetByName('Checks'), gmap = {};
   rows_('Guards').forEach(function (g) { gmap[g.ID] = g; });
-  var iF = HEAD.Checks.indexOf('Flags') + 1, n = 0;
-  rows_('Checks').forEach(function (c) {
-    var parts = String(c.Flags || '').split(' | ').filter(function (x) { return x && x.indexOf('DOUBLE DUTY') !== 0; });
-    var g = gmap[c.GuardId];
-    if (g && c.Presence !== 'Absent' && g.RegularShift && outsideShift_(g.RegularShift, c.Time)) parts.push(doubleDutyMsg_(g, c.Time));
+  var iF = HEAD.Checks.indexOf('Flags') + 1, n = 0, all = rows_('Checks'), byG = {};
+  all.forEach(function (c) { (byG[c.GuardId] = byG[c.GuardId] || []).push(c); });
+  all.forEach(function (c) {
+    var parts = String(c.Flags || '').split(' | ').filter(function (x) { return x && x.indexOf('DOUBLE DUTY') !== 0 && x.indexOf('SHIFT CHANGE') !== 0; });
+    var g = gmap[c.GuardId], df = g ? dutyFlag_(g, c, byG[c.GuardId] || []) : '';
+    if (df) parts.push(df);
     var nf = parts.join(' | ');
     if (nf !== String(c.Flags || '')) { sh.getRange(c._row, iF).setValue(nf); n++; }
   });
@@ -439,8 +460,9 @@ function submitCheck_(q, by, role) {
   if (guard && onPost) {
     var seen = all.some(function (c) { return c.GuardId === guard.ID && c.Presence !== 'Absent'; });
     if (!seen) flags.push('NEW GUARD: first time on record. Ask his agency for his ID proof.');
-    if (guard.RegularShift && outsideShift_(guard.RegularShift, t)) flags.push(doubleDutyMsg_(guard, t));
-    else if (!guard.RegularShift) flags.push('SHIFT NOT SET: this guard has no registered shift yet. Control Room should set it.');
+    var df = dutyFlag_(guard, { Date: date, Shift: shift, Time: t, Presence: presence }, all);
+    if (df) flags.push(df);
+    if (!guard.RegularShift) flags.push('SHIFT NOT SET: this guard has no registered shift yet. Control Room should set it.');
   }
   if (type === 'Temporary' || type === 'Permanent') {
     if (!String(q.related || '').trim()) return { ok: false, error: 'Write whom he is replacing' };

@@ -689,7 +689,7 @@ function viewReview(){
     var ph=function(id){return id?'<a href="'+full(id)+'" target="_blank" rel="noopener"><img alt="Photo" loading="lazy" src="'+thumb(id,500)+'"></a>':'<div class="noph">No photo</div>'};
     var chk=function(c){return '<div class="pc">'+ph(c.photo)+'<div class="pt"><b>'+esc(c.post)+'</b> · '+esc(c.shift)+'<br><small class="muted">'+hm(c.time)+' · by '+esc(c.by)+'</small><br>'+
       '<span class="chip '+(c.presence==='Absent'?'red':c.presence==='Late'?'yel':'grn')+'">'+esc(c.presence)+'</span> '+esc(c.guard||'')+(c.type&&c.type!=='Regular'?' <small>('+esc(c.type)+')</small>':'')+
-      (c.flags?'<div class="fl">'+esc(c.flags)+'</div>':'')+(c.remark?'<small class="muted">'+esc(c.remark)+'</small>':'')+'</div></div>'};
+      (c.flags?String(c.flags).split(' | ').map(function(f){return '<div class="fl"'+(/^(DOUBLE|ABSENT|SAME PHOTO|NO LOCATION|LOCATION|NEW GUARD|LATE)/.test(f)?'':' style="color:var(--mute);font-weight:400"')+'>'+esc(f)+'</div>'}).join(''):'')+(c.remark?'<small class="muted">'+esc(c.remark)+'</small>':'')+'</div></div>'};
     var reg=function(c){return '<div class="pc">'+ph(c.photo)+'<div class="pt"><b>'+esc(c.post)+'</b> '+cpChip(c)+'<br><small class="muted">'+esc(c.date.slice(5))+(c.time?' · '+String(c.time).slice(11,16)+' · by '+esc(c.by):' · due '+esc(c.from)+' to '+esc(c.to))+'</small>'+(c.remark?'<br><small>'+esc(c.remark)+'</small>':'')+'</div></div>'};
     var issH=function(l,note){return '<div class="muted" style="font-size:13px">'+note+'</div>'+(l.length?l.map(issueLine).join(''):'<div class="flag ok">Nothing in this period.</div>')};
     var R={
