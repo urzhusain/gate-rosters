@@ -51,6 +51,7 @@ textarea{min-height:84px;resize:vertical}
 .seg{display:flex;border:2px solid var(--navy);border-radius:10px;overflow:hidden}
 .seg button{flex:1;font:inherit;font-weight:700;padding:11px;border:0;background:transparent;color:var(--navy)}
 .seg button[aria-pressed=true]{background:var(--navy);color:var(--on)}
+#fl{flex-wrap:wrap}#fl button{flex:1 1 30%;padding:9px 6px}
 .nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0);z-index:6}
 .nav button{flex:1;font:inherit;font-size:12.5px;font-weight:700;background:none;border:0;padding:10px 4px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:2px}
 .nav button[aria-current=true]{color:var(--navy);box-shadow:inset 0 3px 0 var(--navy)}
@@ -382,16 +383,17 @@ function viewRaise(){
 }
 
 /* ---------- issues ---------- */
+function fromCR(i){var r=(i.log||[]).filter(function(l){return l.action==='Raised'})[0];return r?r.role==='control':i.category===CAMCAT}
 function isOverdue(i){return i.status!=='Solved'&&ageH(i.created)>=S.overdue}
 function viewIssues(){
   var m=$('#mn');
-  m.innerHTML='<h2>Issues</h2><div class="seg" id="fl"><button data-f="all">All</button><button data-f="overdue">Overdue</button><button data-f="new">Not acknowledged</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
+  m.innerHTML='<h2>Issues</h2><div class="seg" id="fl"><button data-f="all">All</button><button data-f="overdue">Overdue</button><button data-f="new">Not acknowledged</button><button data-f="cr">From Control Room</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
   [].forEach.call(m.querySelectorAll('[data-f]'),function(b){b.setAttribute('aria-pressed',S.filter===b.dataset.f);b.onclick=function(){S.filter=b.dataset.f;renderIssues();[].forEach.call(m.querySelectorAll('[data-f]'),function(x){x.setAttribute('aria-pressed',S.filter===x.dataset.f)})}});
   var dd=S.idays||7;S.idays=null;S.iperiod=dd;
   call('issues',{days:dd}).then(function(r){if(!r.ok){$('#il').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}S.issues=vis(r.issues);renderIssues()});
 }
 function renderIssues(){
-  var all=S.issues||[],f=S.filter,list=all.filter(function(i){if(S.icat&&i.category!==S.icat)return false;return f==='all'?true:f==='overdue'?isOverdue(i):f==='new'?i.status==='Open':f==='open'?i.status!=='Solved':i.status==='Solved'});
+  var all=S.issues||[],f=S.filter,list=all.filter(function(i){if(S.icat&&i.category!==S.icat)return false;return f==='all'?true:f==='overdue'?isOverdue(i):f==='new'?(i.status==='Open'&&i.category!==INFOCAT):f==='cr'?fromCR(i):f==='open'?i.status!=='Solved':i.status==='Solved'});
   list.sort(function(a,b){return (a.priority==='Urgent'?0:1)-(b.priority==='Urgent'?0:1)||parseT(b.created)-parseT(a.created)});
   var od=all.filter(isOverdue).length;
   var box=$('#il');
@@ -808,11 +810,11 @@ function todayBrief(TC,RL,CP,all,AL){
   var need=[];
   RL.filter(function(r){return r.date===t&&r.status==='missed'}).forEach(function(r){need.push((r.role==='control'?'Control Room':'Supervisor')+' missed the '+r.name.replace(/ \(.*\)/,'').toLowerCase()+' ('+r.done+' of '+r.total+' gates)')});
   cpT.filter(function(c){return c.status==='missed'||c.status==='problem'}).forEach(function(c){need.push(c.name+' at '+c.post+': '+(c.status==='missed'?'missed':'problem found'))});
-  if(ab.length)need.push(ab.length+' guard'+(ab.length>1?'s':'')+' absent today');
-  var od=all.filter(isOverdue);if(od.length)need.push(od.length+' issue'+(od.length>1?'s':'')+' unsolved for more than '+S.overdue+' hours');
-  if(waiting.length)need.push(waiting.length+' issue'+(waiting.length>1?'s':'')+' not yet acknowledged by the Control Room');
+  if(ab.length)need.push({t:ab.length+' guard'+(ab.length>1?'s':'')+' absent today',k:'abs'});
+  var od=all.filter(isOverdue);if(od.length)need.push({t:od.length+' issue'+(od.length>1?'s':'')+' unsolved for more than '+S.overdue+' hours',k:'overdue'});
+  if(waiting.length)need.push({t:waiting.length+' issue'+(waiting.length>1?'s':'')+' not yet acknowledged by the Control Room',k:'new'});
   return '<div class="card w2" style="gap:12px"><div class="row" style="justify-content:space-between"><div><div class="ct" style="font-size:19px">Today, '+dShort(t)+'</div><div class="cs" style="margin-top:0">Updated '+hm(new Date(Date.now()+19800000).toISOString().replace('T',' '))+'</div></div><button class="btn o s" id="tbr">Refresh</button></div>'+
-    (need.length?'<div class="flag" style="margin:0"><b>Needs attention</b><br>'+need.map(esc).join('<br>')+'</div>':'<div class="flag ok" style="margin:0">Nothing needs your attention right now.</div>')+
+    (need.length?'<div class="flag" style="margin:0"><b>Needs attention</b><br>'+need.map(function(n){return typeof n==='string'?esc(n):'<a href="#" data-na="'+n.k+'" style="color:inherit">'+esc(n.t)+' ›</a>'}).join('<br>')+'</div>':'<div class="flag ok" style="margin:0">Nothing needs your attention right now.</div>')+
     '<div class="kpis">'+big('abs','Absent',ab.length,1)+big('late','Late',lt.length,0)+big('dbl','Double duty',db.length,1)+big('new','New faces',nw.length,0)+'</div>'+
     '<div class="dg"><div class="card">'+sup+'</div><div class="card">'+ctl+'</div><div class="card w2"><div class="ct">Special today</div>'+sp+'</div></div></div>'}
 function viewHeadDash(){
@@ -887,6 +889,7 @@ function viewHeadDash(){
     };
     [].forEach.call(root.querySelectorAll('[data-k]'),function(b){b.onclick=function(){go[b.dataset.k]()}});
     if($('#tbr',root))$('#tbr',root).onclick=function(){viewHeadDash()};
+    [].forEach.call(root.querySelectorAll('[data-na]'),function(a){a.onclick=function(e){e.preventDefault();var k=a.dataset.na;if(k==='abs'){var b=root.querySelector('[data-tb="abs"]');if(b)b.click();return}S.filter=k;S.icat=null;S.idays=7;S.tab='issues';main()}});
     [].forEach.call(root.querySelectorAll('[data-tb]'),function(b){b.onclick=function(){var k=b.dataset.tb;listModal({abs:'Absent today',late:'Late today',dbl:'Double duty today',new:'New faces today'}[k],S.tbList[k]||[],function(c){return '<b>'+esc(c.guard||'No name')+'</b> · '+esc(c.post)+' · '+esc(c.shift)+'<br><small class="muted">'+esc(String(c.time).slice(11,16))+' · found by '+(c.role==='control'?'Control Room':'Supervisor')+(c.flags?' · '+esc(c.flags):'')+(c.remark?' · '+esc(c.remark):'')+'</small>'},'None today.')}});
     [].forEach.call(root.querySelectorAll('[data-dt]'),function(b){b.onclick=function(){S.dtab=b.dataset.dt;[].forEach.call(root.querySelectorAll('[data-dt]'),function(x){x.classList.toggle('on',x===b)});[].forEach.call(root.querySelectorAll('[data-tp]'),function(p){p.classList.toggle('on',p.dataset.tp===S.dtab)})}});
     [].forEach.call(root.querySelectorAll('[data-ac]'),function(b){b.onclick=function(){var k=b.dataset.ac,L=S.attList[k],fmtc=function(c){return '<b>'+esc(c.guard||'No name')+'</b> · '+esc(c.post)+' · '+esc(c.shift)+'<br><small class="muted">'+esc(c.date.slice(5))+' '+esc(String(c.time).slice(-8,-3))+(c.flags?' · '+esc(c.flags):'')+'</small>'};
