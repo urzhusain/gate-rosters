@@ -1,6 +1,6 @@
 /* Gate Roster Desk: live settings. Claude updates this file when timings or instructions change. */
 window.ROSTER_CONFIG={
-updated:"22 Nov 2026, 10:10 AM",
+updated:"26 Nov 2026, 12:35 PM",
 g4Std:{
   1:["8:35 AM","3:30 PM","8:35","3:30"],2:["8:35 AM","3:30 PM","8:35","3:30"],3:["8:35 AM","3:30 PM","8:35","3:30"],4:["8:35 AM","3:30 PM","8:35","3:30"],
   5:["8:00 AM","3:30 PM","8:00","3:30"],6:["8:00 AM","1:45 PM","8:00","1:45"]
@@ -26,7 +26,11 @@ programs:[
    en:"Mumineen group visit to Evan ul Barakat and Fatemi Masjid (please allow)",gu:"મોમિનીન ગ્રુપની ઇવાન ઉલ બરકાત અને ફાતેમી મસ્જિદની મુલાકાત (પ્રવેશ આપવો)",
    time:["about 10:30 AM","સવારે આશરે 10:30 વાગ્યે"],gateName:["Gate 1","ગેટ 1"],
    people:["about 40 mumineen with Janab Sh Murtaza bhai Amba","જનાબ શેખ મુર્તઝા ભાઈ આંબા સાથે આશરે 40 મોમિનીન"],
-   pass:["Janab comes with the group and identifies them at the gate. Contact number not given yet.","જનાબ ગ્રુપ સાથે આવશે અને ગેટ પર ઓળખ કરાવશે. સંપર્ક નંબર હજુ મળ્યો નથી."],recv:null}
+   pass:["Janab comes with the group and identifies them at the gate. Contact number not given yet.","જનાબ ગ્રુપ સાથે આવશે અને ગેટ પર ઓળખ કરાવશે. સંપર્ક નંબર હજુ મળ્યો નથી."],recv:null},
+  {gate:"g4",from:"2026-11-26",to:"2026-11-26",
+   en:"EXIT: Darajah 11 talabat going to Qubba for gaseel (Raza granted)",gu:"બહાર જવું: દરજહ 11 ના તલબાત ગસીલ માટે કુબ્બા જશે (રઝા મળેલ છે)",
+   time:["Time not given","સમય જણાવેલ નથી"],gateName:["Gate 4 (exit)","ગેટ 4 (બહાર જવા)"],
+   people:["32 talabat of Darajah 11","દરજહ 11 ના 32 તલબાત"],pass:["Allow exit only with their ID card. Check the ID card of each student.","ફક્ત ID કાર્ડ સાથે જ બહાર જવા દેવા. દરેક વિદ્યાર્થીનું ID કાર્ડ ચેક કરવું."],recv:null}
 ],
 /* notes: gates is "all" or a list of ids: g1 g4 g6 g8 m7 mf mb rm ys */
 notes:[]
