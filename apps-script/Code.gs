@@ -501,17 +501,26 @@ function updateIssue_(q, by, role) {
   var allowed = {
     supervisor: ['Comment'],
     control: ['Acknowledged', 'In progress', 'Solved', 'Reopened', 'Comment'],
-    head: ['Query', 'Reopened', 'Comment']
+    head: ['Query', 'Reopened', 'Comment', 'Instruction', 'Noted']
   };
   if (allowed[role].indexOf(op) < 0) return { ok: false, error: 'Not allowed for your role' };
-  if ((op === 'Solved' || op === 'Query' || op === 'Comment') && remark.length < 2) return { ok: false, error: 'Write a remark' };
+  if ((op === 'Solved' || op === 'Query' || op === 'Comment' || op === 'Instruction') && remark.length < 2) return { ok: false, error: 'Write a remark' };
   var rs = rows_('Issues'), is = null;
   for (var i = 0; i < rs.length; i++) if (rs[i].ID === q.id) is = rs[i];
   if (!is) return { ok: false, error: 'Issue not found' };
   if (role === 'supervisor' && is.Category === PRIVATE_CAT) return { ok: false, error: 'Issue not found' };
+  if (op === 'Instruction' || op === 'Noted') {
+    /* Head Office can reply to or close only reports the Control Room raised to it. */
+    var raisedRole = '';
+    rows_('Log').forEach(function (l) { if (l.IssueID === is.ID && l.Action === 'Raised' && !raisedRole) raisedRole = l.Role; });
+    if (!(raisedRole === 'control' || (!raisedRole && is.Category === PRIVATE_CAT))) return { ok: false, error: 'Only for reports raised by the Control Room' };
+    if (is.Status === 'Solved') return { ok: false, error: 'Already closed' };
+    if (op === 'Noted' && !remark) remark = 'Noted by Head Office';
+  }
   var t = now_(), upd = { Updated: t };
   if (op === 'Acknowledged' || op === 'In progress') upd.Status = op;
-  if (op === 'Solved') { upd.Status = 'Solved'; upd.SolvedAt = t; }
+  if (op === 'Instruction') upd.Status = 'In progress';
+  if (op === 'Solved' || op === 'Noted') { upd.Status = 'Solved'; upd.SolvedAt = t; }
   if (op === 'Reopened') { upd.Status = 'Open'; upd.SolvedAt = ''; }
   if (remark) upd.LastRemark = remark.slice(0, 300);
   setCells_('Issues', is._row, upd);
