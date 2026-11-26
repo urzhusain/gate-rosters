@@ -8,7 +8,7 @@ var HEAD = {
   Posts: ['Post'],
   Guards: ['ID', 'Name', 'Phone', 'PhotoId', 'AddedBy', 'AddedAt', 'RegularPost', 'RegularShift', 'Status', 'Agency'],
   Checks: ['Time', 'Date', 'Shift', 'Post', 'GuardId', 'Guard', 'Presence', 'Type', 'Related', 'Remark', 'PhotoId', 'By', 'Flags', 'Role', 'Lat', 'Lng', 'Acc', 'Hash'],
-  Issues: ['ID', 'Created', 'Post', 'Category', 'Priority', 'Description', 'PhotoId', 'RaisedBy', 'Status', 'LastRemark', 'Updated', 'SolvedAt'],
+  Issues: ['ID', 'Created', 'Post', 'Category', 'Priority', 'Description', 'PhotoId', 'RaisedBy', 'Status', 'LastRemark', 'Updated', 'SolvedAt', 'To'],
   Log: ['Time', 'IssueID', 'By', 'Role', 'Action', 'Remark', 'PhotoId'],
   Settings: ['Key', 'Value'],
   Users: ['Name', 'PIN', 'Role', 'Active'],
@@ -469,29 +469,40 @@ function submitCheck_(q, by, role) {
 function raiseIssue_(q, by, role) {
   var desc = String(q.description || '').trim();
   if (desc.length < 3) return { ok: false, error: 'Write what the issue is' };
+  issueToCol_();
+  var to = role === 'control' ? (q.to === 'supervisor' ? 'supervisor' : 'head') : 'control';
   var n = rows_('Issues').length + 1, id = 'I-' + ('0000' + n).slice(-4), t = now_();
-  add_('Issues', {
+  add_('Issues', { To: to,
     ID: id, Created: t, Post: q.post || '', Category: q.category || 'Other', Priority: q.priority === 'Urgent' ? 'Urgent' : 'Normal',
     Description: desc.slice(0, 800), PhotoId: photo_(q.photo, 'issue_' + id), RaisedBy: by, Status: 'Open', LastRemark: '', Updated: t, SolvedAt: ''
   });
   add_('Log', { Time: t, IssueID: id, By: by, Role: role, Action: 'Raised', Remark: desc.slice(0, 200) });
   addAlert_('issue', 'issue:' + id, q.priority === 'Urgent' ? 'high' : 'medium', (q.priority === 'Urgent' ? 'URGENT ' : '') + 'Issue ' + id + ' at ' + (q.post || '') + ': ' + (q.category || 'Other') + ' (raised by ' + by + ')', 'control,head');
-  return { ok: true, id: id };
+  return { ok: true, id: id, to: to };
 }
+/** Adds the To header to the Issues sheet once (issues raised before it existed have it blank). */
+function issueToCol_() {
+  var sh = ss_().getSheetByName('Issues'), c = HEAD.Issues.length, r = sh.getRange(1, c);
+  if (r.getValue() !== 'To') r.setValue('To').setFontWeight('bold').setBackground('#1F3A5F').setFontColor('#ffffff');
+}
+/** Who raised an issue (role) and whom it is for. Old issues: Control Room reports went to Head Office, the rest to the Control Room. */
+function raisedRoles_(logs) { var o = {}; logs.forEach(function (l) { if (l.Action === 'Raised' && !o[l.IssueID]) o[l.IssueID] = l.Role; }); return o; }
+function toOf_(r, rr) { return r.To || ((rr[r.ID] || '') === 'control' ? 'head' : 'control'); }
 
 /** Camera sightings are for Control Room and Head Office only. */
 var PRIVATE_CAT = 'Suspicious activity (seen on camera)';
 function listIssues_(role, q) {
   var days = Math.min(Math.max(Number(q && q.days) || 7, 1), 62);
-  var logs = rows_('Log'), byId = {}, cutoff = new Date().getTime() - days * 24 * 3600 * 1000;
+  issueToCol_();
+  var logs = rows_('Log'), byId = {}, rr = raisedRoles_(logs), cutoff = new Date().getTime() - days * 24 * 3600 * 1000;
   logs.forEach(function (l) { (byId[l.IssueID] = byId[l.IssueID] || []).push({ time: l.Time, by: l.By, role: l.Role, action: l.Action, remark: l.Remark, photo: l.PhotoId }); });
   var out = rows_('Issues').filter(function (r) {
-    if (role === 'supervisor' && r.Category === PRIVATE_CAT) return false;
+    if (role === 'supervisor' && (toOf_(r, rr) === 'head' || (r.Category === PRIVATE_CAT && toOf_(r, rr) !== 'supervisor'))) return false;
     return r.Status !== 'Solved' || new Date((r.SolvedAt || r.Updated).replace(' ', 'T') + '+05:30').getTime() >= cutoff;
   }).map(function (r) {
     return { id: r.ID, created: r.Created, post: r.Post, category: r.Category, priority: r.Priority, description: r.Description,
       photo: r.PhotoId, raisedBy: r.RaisedBy, status: r.Status, lastRemark: r.LastRemark, updated: r.Updated, solvedAt: r.SolvedAt,
-      log: (byId[r.ID] || []).slice(-8) };
+      to: toOf_(r, rr), raisedRole: rr[r.ID] || '', log: (byId[r.ID] || []).slice(-8) };
   });
   return { ok: true, issues: out.slice(days > 7 ? -1500 : -300) };
 }
@@ -499,7 +510,7 @@ function listIssues_(role, q) {
 function updateIssue_(q, by, role) {
   var op = String(q.op || ''), remark = String(q.remark || '').trim();
   var allowed = {
-    supervisor: ['Comment'],
+    supervisor: ['Comment', 'Acknowledged', 'Solved'],
     control: ['Acknowledged', 'In progress', 'Solved', 'Reopened', 'Comment'],
     head: ['Query', 'Reopened', 'Comment', 'Instruction', 'Noted']
   };
@@ -508,12 +519,12 @@ function updateIssue_(q, by, role) {
   var rs = rows_('Issues'), is = null;
   for (var i = 0; i < rs.length; i++) if (rs[i].ID === q.id) is = rs[i];
   if (!is) return { ok: false, error: 'Issue not found' };
-  if (role === 'supervisor' && is.Category === PRIVATE_CAT) return { ok: false, error: 'Issue not found' };
+  var to = toOf_(is, raisedRoles_(rows_('Log')));
+  if (role === 'supervisor' && (to === 'head' || (is.Category === PRIVATE_CAT && to !== 'supervisor'))) return { ok: false, error: 'Issue not found' };
+  if (role === 'supervisor' && op !== 'Comment' && to !== 'supervisor') return { ok: false, error: 'Only the Control Room can change this issue' };
   if (op === 'Instruction' || op === 'Noted') {
-    /* Head Office can reply to or close only reports the Control Room raised to it. */
-    var raisedRole = '';
-    rows_('Log').forEach(function (l) { if (l.IssueID === is.ID && l.Action === 'Raised' && !raisedRole) raisedRole = l.Role; });
-    if (!(raisedRole === 'control' || (!raisedRole && is.Category === PRIVATE_CAT))) return { ok: false, error: 'Only for reports raised by the Control Room' };
+    /* Head Office can reply to or close only reports the Control Room sent to Head Office. */
+    if (to !== 'head') return { ok: false, error: 'Only for reports the Control Room sent to Head Office' };
     if (is.Status === 'Solved') return { ok: false, error: 'Already closed' };
     if (op === 'Noted' && !remark) remark = 'Noted by Head Office';
   }

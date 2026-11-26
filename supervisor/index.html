@@ -51,6 +51,8 @@ textarea{min-height:84px;resize:vertical}
 .seg{display:flex;border:2px solid var(--navy);border-radius:10px;overflow:hidden}
 .seg button{flex:1;font:inherit;font-weight:700;padding:11px;border:0;background:transparent;color:var(--navy)}
 .seg button[aria-pressed=true]{background:var(--navy);color:var(--on)}
+.rvg{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}.rvb{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;font:inherit;padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:inherit;cursor:pointer}.rvb.on{border-color:var(--navy);box-shadow:0 0 0 1px var(--navy)}.rvb .l{font-size:13px;font-weight:700}.rvb .v{font-size:24px;font-weight:800;color:var(--navy)}.rvb .s{font-size:12px;color:var(--mute)}.rvb .s.bad{color:var(--red);font-weight:700}
+.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:8px}.pc{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}.pc img{width:100%;height:190px;object-fit:cover;display:block}.pc .noph{height:70px;display:flex;align-items:center;justify-content:center;background:#f1f1f1;color:#888;font-size:13px}.pc .pt{padding:8px 10px;font-size:14px}.pc .fl{color:var(--red);font-size:12px;font-weight:700;margin-top:4px}
 #fl{flex-wrap:wrap}#fl button{flex:1 1 30%;padding:9px 6px}
 .nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0);z-index:6}
 .nav button{flex:1;font:inherit;font-size:12.5px;font-weight:700;background:none;border:0;padding:10px 4px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -104,7 +106,7 @@ var S={pin:'',name:'',role:'',posts:[],guards:[],overdue:24,tab:'',issues:null,c
 var CAMCAT='Suspicious activity (seen on camera)';
 var INFOCAT='Information (event notice)';
 var INFOLBL={Open:'New',Acknowledged:'Noted','In progress':'Informed',Solved:'Planned'};
-function vis(l){return S.role==='supervisor'?l.filter(function(i){return i.category!==CAMCAT&&i.category!==INFOCAT}):l}
+function vis(l){return S.role==='supervisor'?l.filter(function(i){return i.to==='supervisor'||(i.to!=='head'&&i.category!==CAMCAT&&i.category!==INFOCAT)}):l}
 var CATS=[INFOCAT,'Guard absent','Guard sleeping / away from post','Uniform / dress','Complaint about guard','Security breach','Suspicious activity (seen on camera)','Visitor or entry problem','Gate pass / material','Camera / equipment','Cleanliness / maintenance','Other'];
 var $=function(s,r){return (r||document).querySelector(s)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -250,7 +252,7 @@ function logout(){S.pin='';S.role='';store('pin','');store('name','');viewLogin(
 /* ---------- shell ---------- */
 function tabsFor(){
   if(S.role==='control')return [['home','🏠','Home'],['issues','📋','Issues'],['raise','📹','Camera'],['round','🚶','Round'],['report','📊','Report'],['roster','🗓️','Roster']];
-  if(S.role==='head')return [['home','🏠','Home'],['issues','📋','Issues'],['report','📊','Report'],['roster','🗓️','Roster']];
+  if(S.role==='head')return [['home','🏠','Home'],['review','🔎','Review'],['issues','📋','Issues'],['report','📊','Report'],['roster','🗓️','Roster']];
   return [['home','🏠','Home'],['round','🚶','Round'],['raise','➕','Raise'],['issues','📋','Issues'],['roster','🗓️','Roster']];}
 function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role]}
 function main(){
@@ -260,7 +262,7 @@ function main(){
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
   $('#lo').onclick=logout;$('#odb').onclick=openOnDuty;
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
-  var v={home:viewHome,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster}[S.tab];$('#mn').classList.remove('wide');v();
+  var v={home:viewHome,review:viewReview,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster}[S.tab];$('#mn').classList.remove('wide');v();
 }
 
 /* ---------- round ---------- */
@@ -348,15 +350,18 @@ function openCheck(post){
 function viewRaise(){
   var pf=S.prefill||{};S.prefill=null;if(!pf.description&&!pf.post){try{pf=JSON.parse(store('draft_raise')||'{}')||{}}catch(e){pf={}}}
   var cam=S.role==='control';if(cam&&!pf.category)pf.category='Suspicious activity (seen on camera)';
-  $('#mn').innerHTML='<h2>'+(cam?'Report from cameras':'Raise an issue')+'</h2><div class="card">'+
+  $('#mn').innerHTML='<h2>'+(cam?'New report':'Raise an issue')+'</h2><div class="card">'+
   '<div class="f"><label>Where?</label><select id="rp">'+S.allposts.concat(['Other / whole campus']).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>What kind?</label><select id="rc">'+CATS.filter(function(c){return (c!==INFOCAT||S.role==='head')&&(cam||S.role==='head'||c!==CAMCAT)}).map(function(c){return '<option'+(pf.category===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>'+
+  (cam?'<div class="f"><label>Send to</label><div class="seg" id="rto"><button data-to="head">Head Office</button><button data-to="supervisor">Supervisor</button></div></div>':'')+
   '<div class="f"><label>How urgent?</label><div class="seg" id="up"><button data-u="Normal" aria-pressed="true">Normal</button><button data-u="Urgent" aria-pressed="false">Urgent</button></div></div>'+
   (cam?'<div class="f"><label>Camera or exact spot (optional)</label><input id="rcam" placeholder="e.g. Camera 12, near Gate 4 parking"></div>':'')+
   '<div class="f"><label>Details</label><textarea id="rd">'+esc(pf.description||'')+'</textarea></div>'+
   '<div class="f"><label>Photo or screenshot</label><input id="rf" type="file" accept="image/*" capture="environment">'+(cam?'<input id="rf2" type="file" accept="image/*" style="display:none"><button type="button" class="btn o s" id="rfu" style="margin-top:6px">Upload a saved photo or screenshot instead</button>':'')+'</div><div class="err" id="re"></div>'+
   '<button class="btn" id="rs">'+(cam?'Save report':'Send to Control Room')+'</button></div>';
-  var urg=pf.urg==='Urgent'?'Urgent':'Normal';
+  var urg=pf.urg==='Urgent'?'Urgent':'Normal',rto=pf.to==='supervisor'?'supervisor':'head';
+  function setTo(){[].forEach.call(document.querySelectorAll('[data-to]'),function(x){x.setAttribute('aria-pressed',x.dataset.to===rto)});if(cam)$('#rs').textContent='Send to '+WHO[rto]}
+  [].forEach.call(document.querySelectorAll('[data-to]'),function(b){b.onclick=function(){rto=b.dataset.to;setTo()}});setTo();
   [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.setAttribute('aria-pressed',b.dataset.u===urg)});
   function saveDraft(){store('draft_raise',JSON.stringify({post:$('#rp').value,category:$('#rc').value,urg:urg,description:$('#rd').value}))}
   ['#rp','#rc','#rd'].forEach(function(q){$(q).addEventListener('input',saveDraft);$(q).addEventListener('change',saveDraft)});
@@ -366,11 +371,11 @@ function viewRaise(){
   if($('#rf2'))$('#rf2').onchange=function(){var f=this.files[0];if(!f)return;try{var dt=new DataTransfer();dt.items.add(f);$('#rf').files=dt.files;$('#rf').dispatchEvent(new Event('change',{bubbles:true}));toast('Photo added')}catch(x){toast('Could not add the photo')}};
   $('#rs').onclick=function(){
     var b=this;b.disabled=true;b.textContent='Sending…';
-    compress($('#rf').files[0]).then(function(img){window._ri=img;return call('raiseIssue',{post:$('#rp').value,category:$('#rc').value,priority:urg,description:fullDesc(),photo:img})}).then(function(r){
-      b.disabled=false;b.textContent=cam?'Save report':'Send to Control Room';
+    compress($('#rf').files[0]).then(function(img){window._ri=img;return call('raiseIssue',{to:rto,post:$('#rp').value,category:$('#rc').value,priority:urg,description:fullDesc(),photo:img})}).then(function(r){
+      b.disabled=false;b.textContent=cam?'Send to '+WHO[rto]:'Send to Control Room';
       if(!r.ok){$('#re').textContent=r.error;return}
       S.issues=null;store('draft_raise','');
-      if(cam){toast('Report '+r.id+' saved');S.tab='issues';S.filter='open';main();return}
+      if(cam){toast(r.id+' sent to '+WHO[rto]);S.tab='issues';S.filter='open';main();return}
       var CR=((window.SUP_CONFIG||{}).controlWhatsapp||'').replace(/\D/g,'');
       var msg=(urg==='Urgent'?'URGENT - ':'')+'Issue '+r.id+'\n'+$('#rp').value+' - '+$('#rc').value+'\n'+($('#rd').value||'(no details)')+'\nRaised by '+S.name+(window._ri?'\n(photo is in the app)':'');
       var wa='https://wa.me/'+(CR.length===10?'91'+CR:CR)+'?text='+encodeURIComponent(msg);
@@ -383,17 +388,20 @@ function viewRaise(){
 }
 
 /* ---------- issues ---------- */
-function fromCR(i){var r=(i.log||[]).filter(function(l){return l.action==='Raised'})[0];return r?r.role==='control':i.category===CAMCAT}
+function raiserOf(i){if(i.raisedRole)return i.raisedRole;var r=(i.log||[]).filter(function(l){return l.action==='Raised'})[0];return r?r.role:(i.category===CAMCAT?'control':'')}
+function fromCR(i){return raiserOf(i)==='control'}
+function toOf(i){return i.to||(fromCR(i)?'head':'control')}
+var WHO={head:'Head Office',control:'Control Room',supervisor:'Supervisor'};
 function isOverdue(i){return i.status!=='Solved'&&ageH(i.created)>=S.overdue}
 function viewIssues(){
   var m=$('#mn');
-  m.innerHTML='<h2>Issues</h2><div class="seg" id="fl"><button data-f="all">All</button><button data-f="overdue">Overdue</button><button data-f="new">Not acknowledged</button><button data-f="cr">From Control Room</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
+  m.innerHTML='<h2>Issues</h2><div class="seg" id="fl"><button data-f="all">All</button><button data-f="overdue">Overdue</button><button data-f="new">Not acknowledged</button><button data-f="cr">Control Room → Head Office</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
   [].forEach.call(m.querySelectorAll('[data-f]'),function(b){b.setAttribute('aria-pressed',S.filter===b.dataset.f);b.onclick=function(){S.filter=b.dataset.f;renderIssues();[].forEach.call(m.querySelectorAll('[data-f]'),function(x){x.setAttribute('aria-pressed',S.filter===x.dataset.f)})}});
   var dd=S.idays||7;S.idays=null;S.iperiod=dd;
   call('issues',{days:dd}).then(function(r){if(!r.ok){$('#il').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}S.issues=vis(r.issues);renderIssues()});
 }
 function renderIssues(){
-  var all=S.issues||[],f=S.filter,list=all.filter(function(i){if(S.icat&&i.category!==S.icat)return false;return f==='all'?true:f==='overdue'?isOverdue(i):f==='new'?(i.status==='Open'&&i.category!==INFOCAT):f==='cr'?fromCR(i):f==='open'?i.status!=='Solved':i.status==='Solved'});
+  var all=S.issues||[],f=S.filter,list=all.filter(function(i){if(S.icat&&i.category!==S.icat)return false;return f==='all'?true:f==='overdue'?isOverdue(i):f==='new'?(i.status==='Open'&&i.category!==INFOCAT):f==='cr'?toOf(i)==='head':f==='open'?i.status!=='Solved':i.status==='Solved'});
   list.sort(function(a,b){return (a.priority==='Urgent'?0:1)-(b.priority==='Urgent'?0:1)||parseT(b.created)-parseT(a.created)});
   var od=all.filter(isOverdue).length;
   var box=$('#il');
@@ -407,7 +415,7 @@ function statusChip(s,cat){if(cat===INFOCAT)return '<span class="chip '+({Open:'
 function issueCard(i){
   return '<button class="post" data-i="'+esc(i.id)+'" style="flex-direction:column;align-items:stretch"><span class="row" style="justify-content:space-between"><b>'+esc(i.id)+' · '+esc(i.post)+'</b>'+statusChip(i.status,i.category)+'</span>'+
    '<span>'+esc(i.category)+(i.priority==='Urgent'?' <span class="chip red">URGENT</span>':'')+(isOverdue(i)?' <span class="chip red">OVERDUE</span>':'')+'</span>'+
-   '<span class="muted">'+esc(i.description.slice(0,140))+'</span><small>Raised by '+esc(i.raisedBy)+' · '+ageTxt(i.created)+' ago'+(i.lastRemark?' · Last: '+esc(i.lastRemark.slice(0,60)):'')+'</small></button>';
+   '<span class="muted">'+esc(i.description.slice(0,140))+'</span><small>'+esc(WHO[raiserOf(i)]||i.raisedBy)+' → '+esc(WHO[toOf(i)]||'')+' · '+ageTxt(i.created)+' ago'+(i.lastRemark?' · Last: '+esc(i.lastRemark.slice(0,60)):'')+'</small></button>';
 }
 function openIssue(id){
   var i=(S.issues||[]).filter(function(x){return x.id===id})[0];if(!i)return;
@@ -416,25 +424,26 @@ function openIssue(id){
   else if(S.role==='control'){btns=(i.status==='Solved'?'<button class="btn o" data-op="Reopened">Reopen</button>':'<div class="row"><button class="btn o s" data-op="Acknowledged">Acknowledge</button><button class="btn o s" data-op="In progress">In progress</button><button class="btn g s" data-op="Solved">Solved</button></div>')}
   if(S.role==='control'&&i.status!=='Solved'&&i.category!==INFOCAT){var AG=(window.SUP_CONFIG||{}).agencies||{Sainik:{name:'Sainik Security',whatsapp:''},Avengers:{name:'Avengers',whatsapp:''}};
     btns+='<div class="f" style="margin-top:8px"><label>Forward to agency</label><select id="ag">'+Object.keys(AG).map(function(k){return '<option value="'+esc(k)+'"'+((AG[k].posts||[]).indexOf(i.post)>=0?' selected':'')+'>'+esc(AG[k].name)+'</option>'}).join('')+'</select></div><button class="btn g" id="fw">Forward to agency on WhatsApp</button>'}
-  var hCR=S.role==='head'&&fromCR(i)&&i.status!=='Solved';
+  var hCR=S.role==='head'&&toOf(i)==='head'&&i.status!=='Solved',sCR=S.role==='supervisor'&&toOf(i)==='supervisor'&&i.status!=='Solved';
+  if(sCR){btns='<div class="row"><button class="btn o s" data-op="Acknowledged">Seen</button><button class="btn g s" data-op="Solved">Done</button></div>'}
   if(S.role==='head'){btns=hCR?'<button class="btn g" data-op="Instruction">Reply with instruction</button><button class="btn o" data-op="Noted">Noted, close</button>':'<button class="btn r" data-op="Query">Ask Control Room: why not solved?</button>'+(i.status==='Solved'?'<button class="btn o" data-op="Reopened">Reopen</button>':'')}
   var d=modal('<h2>'+esc(i.id)+' · '+esc(i.post)+'</h2><div class="row">'+statusChip(i.status,i.category)+(i.priority==='Urgent'?'<span class="chip red">URGENT</span>':'')+'<span class="muted">'+esc(i.category)+' · '+ageTxt(i.created)+' old</span></div><div>'+esc(i.description)+'</div>'+
    (i.photo?'<a href="'+full(i.photo)+'" target="_blank" rel="noopener"><img class="th" alt="Issue photo" src="'+thumb(i.photo)+'"></a>':'')+
-   '<div class="muted">Raised by '+esc(i.raisedBy)+'</div>'+
+   '<div class="muted">Raised by '+esc(i.raisedBy)+' · for <b>'+esc(WHO[toOf(i)]||'')+'</b></div>'+
    (i.log&&i.log.length?'<div class="log">'+i.log.map(function(l){return '<div><b>'+esc(l.action)+'</b> · '+esc(l.by)+' ('+esc(l.role)+') · '+esc(l.time.slice(5,16))+(l.remark?'<br>'+esc(l.remark):'')+(l.photo?' <a href="'+full(l.photo)+'" target="_blank" rel="noopener">photo</a>':'')+'</div>'}).join('')+'</div>':'')+
-   '<div class="f"><label>Remark</label><textarea id="ur" placeholder="'+(hCR?'Your instruction or reply to the Control Room':S.role==='head'?'Your question to the Control Room':'What was done?')+'"></textarea></div><div class="f"><label>Photo (optional)</label><input id="uf" type="file" accept="image/*" capture="environment"></div><div class="err" id="ue"></div>'+btns+
+   '<div class="f"><label>Remark</label><textarea id="ur" placeholder="'+(sCR?'What did you do? (needed for Done)':hCR?'Your instruction or reply to the Control Room':S.role==='head'?'Your question to the Control Room':'What was done?')+'"></textarea></div><div class="f"><label>Photo (optional)</label><input id="uf" type="file" accept="image/*" capture="environment"></div><div class="err" id="ue"></div>'+btns+
    '<button class="btn o s" data-op="Comment">Add comment only</button><button class="btn o" id="cl">Close</button>');
   $('#cl',d).onclick=function(){d.remove()};
   if($('#fw',d))$('#fw',d).onclick=function(){
     var k=$('#ag',d).value,a=((window.SUP_CONFIG||{}).agencies||{})[k]||{name:k,whatsapp:''},n=(a.whatsapp||'').replace(/\D/g,'');
     var msg='Complaint '+i.id+' - '+i.post+'\n'+i.category+(i.priority==='Urgent'?' (URGENT)':'')+'\n'+i.description+'\nRaised '+ageTxt(i.created)+' ago. Please act and confirm.\n- Control Room, Aljamea';
     window.open('https://wa.me/'+(n.length===10?'91'+n:n)+'?text='+encodeURIComponent(msg),'_blank');
-    call('updateIssue',{id:id,op:'Comment',remark:'Forwarded to '+a.name+' on WhatsApp'}).then(function(r){d.remove();toast(r.ok?'Forward recorded':'Forward not recorded');viewIssues()})};
+    call('updateIssue',{id:id,op:'Comment',remark:'Forwarded to '+a.name+' on WhatsApp'}).then(function(r){d.remove();toast(r.ok?'Forward recorded':'Forward not recorded');(S.tab==='review'?viewReview:viewIssues)()})};
   [].forEach.call(d.querySelectorAll('[data-op]'),function(b){b.onclick=function(){
     var op=b.dataset.op;b.disabled=true;
     compress($('#uf',d).files[0]).then(function(img){return call('updateIssue',{id:id,op:op,remark:$('#ur',d).value||(i.category===INFOCAT?INFOLBL[op==='Acknowledged'?'Acknowledged':op==='In progress'?'In progress':'Solved']:''),photo:img})}).then(function(r){
       b.disabled=false;if(!r.ok){$('#ue',d).textContent=r.error;return}
-      d.remove();toast('Updated');viewIssues()})}});
+      d.remove();toast('Updated');(S.tab==='review'?viewReview:S.tab==='home'?viewHome:viewIssues)()})}});
 }
 
 /* ---------- gate-wise views ---------- */
@@ -649,6 +658,52 @@ function bars(items,cls){var m=Math.max.apply(null,items.map(function(i){return 
 function covLine(label,n,total){var pc=total?Math.round(n/total*100):0;return '<div><div class="row" style="justify-content:space-between"><span>'+label+'</span><b>'+n+' of '+total+'</b></div><div style="background:var(--line);border-radius:99px;height:10px;overflow:hidden"><div style="height:100%;width:'+pc+'%;background:var(--'+(pc===100?'grn':'navy')+')"></div></div></div>'}
 function goBtns(root){[].forEach.call(root.querySelectorAll('[data-tab-go]'),function(b){b.onclick=function(){S.tab=b.dataset.tabGo;main()}});[].forEach.call(root.querySelectorAll('[data-issue]'),function(b){b.onclick=function(){openIssue(b.dataset.issue)}})}
 function issueLine(i){return '<button class="post" data-issue="'+esc(i.id)+'" style="padding:10px"><span><b>'+esc(i.id)+' · '+esc(i.post)+'</b><small>'+esc(i.category)+' · '+ageTxt(i.created)+' ago'+(i.lastRemark?' · '+esc(i.lastRemark.slice(0,50)):'')+'</small></span>'+statusChip(i.status,i.category)+'</button>'}
+/* ---------- Head Office: Review (who sent what to whom, and round photos) ---------- */
+function viewReview(){
+  var m=$('#mn');m.classList.add('wide');var p=S.rvp||'today',sec=S.rvs||'head';
+  var rg=p==='today'?[ymd(0),ymd(0)]:p==='yday'?[ymd(-1),ymd(-1)]:[ymd(-6),ymd(0)];
+  m.innerHTML='<h2>Review</h2><div class="seg" id="rvp" style="margin-bottom:10px"><button data-p="today">Today</button><button data-p="yday">Yesterday</button><button data-p="7">Last 7 days</button></div><div id="rv" class="muted">Loading…</div>';
+  [].forEach.call(m.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',b.dataset.p===p);b.onclick=function(){S.rvp=b.dataset.p;viewReview()}});
+  Promise.all([call('issues',{days:p==='7'?8:3}),call('checks',{from:rg[0],to:rg[1]}),call('checkpoints',{days:p==='7'?7:2})]).then(function(rs){
+    if(!rs[0].ok||!rs[1].ok){$('#rv').innerHTML='<span class="err">'+esc(rs[0].ok?rs[1].error:rs[0].error)+'</span>';return}
+    var inR=function(d){d=String(d||'').slice(0,10);return d>=rg[0]&&d<=rg[1]};
+    var iss=rs[0].issues.filter(function(i){return i.category!==INFOCAT&&(inR(i.created)||(p!=='yday'&&i.status!=='Solved'))});S.issues=rs[0].issues;
+    var srt=function(l){return l.sort(function(a,b){return (a.status==='Solved'?1:0)-(b.status==='Solved'?1:0)||parseT(b.created)-parseT(a.created)})};
+    var A=srt(iss.filter(function(i){return toOf(i)==='head'})),B=srt(iss.filter(function(i){return raiserOf(i)==='supervisor'})),C=srt(iss.filter(function(i){return toOf(i)==='supervisor'}));
+    var ck=rs[1].checks.slice().sort(function(a,b){return a.time<b.time?1:-1});
+    var D=ck.filter(function(c){return c.role==='supervisor'}),E=ck.filter(function(c){return c.role==='control'});
+    var F=(rs[2]&&rs[2].ok?rs[2].checkpoints:[]).filter(function(c){return c.type==='photo'&&inR(c.date)&&c.status!=='upcoming'});
+    var openN=function(l){return l.filter(function(i){return i.status!=='Solved'}).length};
+    var missF=F.filter(function(c){return !c.photo&&c.status!=='open'}).length;
+    var S6=[
+      ['head','Control Room → you',A.length,openN(A)?openN(A)+' open':'all closed',openN(A)],
+      ['sup2cr','Supervisor → Control Room',B.length,openN(B)?openN(B)+' open':'all closed',openN(B)],
+      ['cr2sup','Control Room → Supervisor',C.length,openN(C)?openN(C)+' open':'all closed',openN(C)],
+      ['suprnd','Supervisor round photos',D.length,D.filter(function(c){return c.photo}).length+' with photo',D.filter(function(c){return /SAME PHOTO|LOCATION|ABSENT/.test(c.flags)}).length],
+      ['crrnd','Control Room round checks',E.length,E.filter(function(c){return c.photo}).length+' with photo',0],
+      ['reg','Register photos',F.filter(function(c){return c.photo}).length+' of '+F.length,missF?missF+' missed':'none missed',missF]
+    ];
+    var h='<div class="rvg">'+S6.map(function(x){return '<button type="button" class="rvb'+(sec===x[0]?' on':'')+'" data-s="'+x[0]+'"><span class="l">'+x[1]+'</span><span class="v">'+x[2]+'</span><span class="s'+(x[4]?' bad':'')+'">'+x[3]+'</span></button>'}).join('')+'</div><div class="card" id="rvl" style="margin-top:12px"></div>';
+    $('#rv').outerHTML='<div id="rv">'+h+'</div>';
+    var hm=function(t){return String(t).slice(5,16).replace(' ',' · ')};
+    var ph=function(id){return id?'<a href="'+full(id)+'" target="_blank" rel="noopener"><img alt="Photo" loading="lazy" src="'+thumb(id,500)+'"></a>':'<div class="noph">No photo</div>'};
+    var chk=function(c){return '<div class="pc">'+ph(c.photo)+'<div class="pt"><b>'+esc(c.post)+'</b> · '+esc(c.shift)+'<br><small class="muted">'+hm(c.time)+' · by '+esc(c.by)+'</small><br>'+
+      '<span class="chip '+(c.presence==='Absent'?'red':c.presence==='Late'?'yel':'grn')+'">'+esc(c.presence)+'</span> '+esc(c.guard||'')+(c.type&&c.type!=='Regular'?' <small>('+esc(c.type)+')</small>':'')+
+      (c.flags?'<div class="fl">'+esc(c.flags)+'</div>':'')+(c.remark?'<small class="muted">'+esc(c.remark)+'</small>':'')+'</div></div>'};
+    var reg=function(c){return '<div class="pc">'+ph(c.photo)+'<div class="pt"><b>'+esc(c.post)+'</b> '+cpChip(c)+'<br><small class="muted">'+esc(c.date.slice(5))+(c.time?' · '+String(c.time).slice(11,16)+' · by '+esc(c.by):' · due '+esc(c.from)+' to '+esc(c.to))+'</small>'+(c.remark?'<br><small>'+esc(c.remark)+'</small>':'')+'</div></div>'};
+    var issH=function(l,note){return '<div class="muted" style="font-size:13px">'+note+'</div>'+(l.length?l.map(issueLine).join(''):'<div class="flag ok">Nothing in this period.</div>')};
+    var R={
+      head:function(){return '<div class="ct">Control Room → you (Head Office)</div>'+issH(A,'Open one and use Reply with instruction, or Noted, close.')},
+      sup2cr:function(){return '<div class="ct">Supervisor → Control Room</div>'+issH(B,'Only the Control Room closes these. If one is stuck, open it and ask why.')},
+      cr2sup:function(){return '<div class="ct">Control Room → Supervisor</div>'+issH(C,'The supervisor marks these Done with what he did.')},
+      suprnd:function(){return '<div class="ct">Supervisor round photos</div><div class="muted" style="font-size:13px">Newest first. Red notes are warnings (same photo reused, away from the gate, absent).</div>'+(D.length?'<div class="pg">'+D.map(chk).join('')+'</div>':'<div class="flag">No supervisor round checks in this period.</div>')},
+      crrnd:function(){return '<div class="ct">Control Room round checks</div><div class="muted" style="font-size:13px">Gates checked by the Control Room on camera. A photo is optional for them.</div>'+(E.length?'<div class="pg">'+E.map(chk).join('')+'</div>':'<div class="flag">No Control Room round checks in this period.</div>')},
+      reg:function(){return '<div class="ct">Register photos (Gate 1, 4, 8 &amp; 9)</div><div class="muted" style="font-size:13px">The supervisor photographs each gate register between 5:00 and 8:45 PM. Tap a photo to open it full size and read it.</div>'+(F.length?'<div class="pg">'+F.map(reg).join('')+'</div>':'<div class="muted">Nothing due yet in this period.</div>')}
+    };
+    var show=function(){$('#rvl').innerHTML=R[sec]();goBtns($('#rvl'))};show();
+    [].forEach.call($('#rv').querySelectorAll('[data-s]'),function(b){b.onclick=function(){sec=S.rvs=b.dataset.s;[].forEach.call($('#rv').querySelectorAll('[data-s]'),function(x){x.classList.toggle('on',x===b)});show()}});
+  });
+}
 /* ---------- Head Office analytics dashboard ---------- */
 var DASH_CSS='<style>'+
 '.wide{max-width:1120px!important}'+
@@ -982,6 +1037,8 @@ function viewHome(){
     if(S.role!=='head')html+=profileCard();
     if(S.role==='supervisor'){
       var todo=S.posts.filter(function(p){return !cur[p]}),mine=openI.filter(function(i){return i.raisedBy===S.name});
+      var inb=openI.filter(function(i){return toOf(i)==='supervisor'});
+      if(inb.length)html+='<div class="card" style="border:2px solid var(--red)"><b>From the Control Room ('+inb.length+')</b><div class="muted" style="font-size:13px">Tap one, do it, then tap Done and write what you did.</div>'+inb.map(issueLine).join('')+'</div>';
       html+='<div class="card"><b>Round progress · '+sh+' shift</b>'+covLine(sh+' shift',S.posts.length-todo.length,S.posts.length)+
         (todo.length?'<div class="muted">Still to check:</div><div class="row">'+todo.slice(0,6).map(function(p){return '<button class="chip yel" style="border:0;font:inherit;font-weight:800" data-chk="'+esc(p)+'">'+esc(p)+'</button>'}).join('')+(todo.length>6?'<span class="muted">+'+(todo.length-6)+' more</span>':'')+'</div>':'<div class="flag ok">All gates checked this shift.</div>')+
         '<div class="row"><button class="btn s" data-tab-go="round">Start round</button><button class="btn o s" data-tab-go="raise">Raise issue</button></div></div>'+'<div class="ng">'+(rs[2]&&rs[2].ok?(function(){var st=roundStats(rs[2].rounds);S.homeData={rounds:rs[2].rounds,mine:mine};return ntile('rounds','Rounds',st.open?'Open':(st.miss?st.miss:st.done+'/'+st.total),st.open?st.open.name:(st.miss?'missed':'done today'),st.miss?'red':(st.open?'yel':'grn'))})():'')+ntile('mine','My open issues',mine.length,mine.length?'tap to see':'all solved',mine.length?'yel':'grn')+(rs[4]&&rs[4].ok?(function(){var due=cpDue(rs[4].checkpoints);S.homeData.cp=1;return ntile('cp','Checkpoints',due.length,due.length?'to confirm now':'nothing due',due.length?'yel':'grn')})():'')+'</div>'+rosterCard();
