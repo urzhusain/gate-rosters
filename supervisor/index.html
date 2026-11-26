@@ -551,13 +551,14 @@ function viewAgency(){
     var minD=rs[1].checks.reduce(function(a,c){return !a||c.date<a?c.date:a},''),st0=(minD&&minD>r0[0])?minD:r0[0];
     if(st0>end){$('#ar').textContent='Scanning started on '+dShort(st0)+'. The report is available from tomorrow.';return}
     var days=dDays(st0,end),EX=(window.SUP_CONFIG||{}).expected||{},CFG=(window.SUP_CONFIG||{}).agencies||{},gm={};S.guards.forEach(function(g){gm[g.id]=g});
-    var credit={},absent={},seenDays={},seenPost={};
+    var credit={},absent={},seenDays={},seenPost={},dbl={};
     rs[1].checks.forEach(function(c){
-      var g=gm[c.guardId],sh=(g&&g.shift)||c.shift,d=c.date,x=(String(c.time).match(/(\d+):(\d+)/)||[0,0,0]);
+      var g=gm[c.guardId],sh=c.shift||(g&&g.shift)||'Day',d=c.date,x=(String(c.time).match(/(\d+):(\d+)/)||[0,0,0]);
       if(sh==='Night'&&(+x[1])*60+ +x[2]<720)d=prevDay(d);
       if(d>end||d<r0[0])return;
       if(c.presence==='Absent'){absent[c.post+'|'+sh+'|'+d]=1;return}
       if(!g)return;var ag=g.agency||'Sainik',k=c.post+'|'+sh+'|'+d+'|'+ag;
+      if(/DOUBLE DUTY/.test(c.flags)){var dk=g.id+'|'+d+'|'+sh;(dbl[ag]=dbl[ag]||{})[dk]=g.name+' · '+c.post+' · '+dShort(d)+' '+sh}
       (credit[k]=credit[k]||{})[g.id]=1;(seenDays[g.id]=seenDays[g.id]||{})[d]=1;(seenPost[g.id]=seenPost[g.id]||{})[c.post]=1});
     var out='',csv=[['Agency','Gate','Shift','Contracted per day','Duties due','Verified present','Marked absent','Not verified','Verified %']],wa={};
     ['Sainik','Avenger'].forEach(function(A){
@@ -577,11 +578,18 @@ function viewAgency(){
       out+='<div class="card" style="gap:8px"><div class="row" style="justify-content:space-between"><b style="font-size:18px">'+esc(cfg.name)+'</b><span class="chip '+(pct>=90?'grn':pct>=60?'yel':'red')+'">'+pct+'% verified</span></div>'+
         '<div class="muted">'+dShort(st0)+' to '+dShort(end)+': '+T.ver+' of '+T.due+' contracted duties were seen present by a scan · '+T.abs+' marked absent · '+T.nv+' not verified</div>'+
         '<div class="scr"><table><tr><th>Gate</th><th>Shift</th><th>Per day</th><th>Due</th><th>Seen</th><th>Absent</th><th>No scan</th></tr>'+rows.map(function(r){return '<tr><td>'+esc(r.p)+'</td><td>'+r.sh+'</td><td>'+r.exp+'</td><td>'+r.due+'</td><td>'+r.ver+'</td><td>'+(r.ab?'<span class="chip red">'+r.ab+'</span>':'0')+'</td><td>'+r.nv+'</td></tr>'}).join('')+'<tr><td><b>Total</b></td><td></td><td></td><td><b>'+T.due+'</b></td><td><b>'+T.ver+'</b></td><td><b>'+T.abs+'</b></td><td><b>'+T.nv+'</b></td></tr></table></div>'+
+        (function(){var mk2=A+'|'+r0[0].slice(0,7),bv=store('billed_'+mk2)||'',dl=Object.keys(dbl[A]||{}).map(function(k){return dbl[A][k]});
+          return '<div class="card" style="background:var(--bg);gap:6px"><b>Compare with the invoice</b><div class="row" style="align-items:center"><label class="muted" style="font-size:14px">Duties billed in the invoice</label><input type="number" inputmode="numeric" min="0" data-billed="'+esc(mk2)+'" data-due="'+T.due+'" data-ver="'+T.ver+'" value="'+esc(bv)+'" style="width:110px"></div><div data-bres="'+esc(mk2)+'"></div>'+
+          (dl.length?'<div class="flag" style="margin:0">'+dl.length+' double dut'+(dl.length>1?'ies':'y')+' (same man on back-to-back shifts). Each one is a shift where one man covered two duties, so you may be billed for a second guard who never came:<br><small>'+dl.slice(0,12).map(esc).join('<br>')+(dl.length>12?'<br>…':'')+'</small></div>':'<div class="flag ok" style="margin:0">No double duty this month.</div>')+'</div>'})()+
         (rows.some(function(r){return r.ex})?'<div class="flag info">More guards than the contract were seen at: '+rows.filter(function(r){return r.ex}).map(function(r){return esc(r.p)+' '+r.sh+' ('+r.ex+' days)'}).join(', ')+'. Check whether these are extra guards you are billed for, or not in the contract.</div>':'')+
         '<details><summary class="muted" style="cursor:pointer">Guards of this agency ('+gl.length+')</summary><div class="scr"><table><tr><th>Guard</th><th>Shift</th><th>Days seen</th><th>Posts</th></tr>'+gl.map(function(x){return '<tr><td>'+esc(x.g.name)+'</td><td>'+esc(x.g.shift||'?')+'</td><td>'+x.n+'</td><td>'+esc(x.posts.join(', '))+'</td></tr>'}).join('')+'</table></div></details>'+
         '<div class="row"><button class="btn o s" data-csv="'+A+'">Download CSV</button><button class="btn g s" data-wa="'+A+'">Send summary on WhatsApp</button></div></div>'});
     $('#ar').outerHTML='<div id="ar" style="display:flex;flex-direction:column;gap:12px">'+(out||'<div class="muted">Nothing to report. Set the contracted guards per gate in config.js.</div>')+
       '<div class="flag info" style="margin:0"><b>How to read this.</b> A duty is "seen" only when a Supervisor or Control Room scan found a guard of that agency present at that gate and shift. "No scan" is not the same as absent: nobody scanned that gate in that shift. Contracted guards per gate come from the October invoices and can be changed in config.js. Counted from the first day of scanning ('+dShort(st0)+').</div></div>';
+    var billRes=function(i){var v=i.value.trim(),out=document.querySelector('[data-bres="'+i.dataset.billed+'"]');store('billed_'+i.dataset.billed,v);if(!v){out.innerHTML='';return}
+      var b=+v,ver=+i.dataset.ver,due=+i.dataset.due,gap=b-ver;
+      out.innerHTML='<div class="flag '+(gap>0?'':'ok')+'" style="margin:0">'+(gap>0?'<b>'+gap+' duties billed but not seen present.</b> Billed '+b+', seen '+ver+(b>due?', and the bill is '+(b-due)+' above the contract ('+due+' due).':'.')+' Ask the agency to show these, or deduct them. Some may be gates nobody scanned (see "No scan").':'Billed '+b+', seen present '+ver+'. Nothing to question.')+'</div>'};
+    [].forEach.call(document.querySelectorAll('[data-billed]'),function(i){i.oninput=function(){billRes(i)};billRes(i)});
     [].forEach.call(document.querySelectorAll('[data-csv]'),function(b){b.onclick=function(){csvDownload('agency-check-'+b.dataset.csv+'-'+r0[0].slice(0,7)+'.csv',csv.filter(function(r,i){return i===0||r[0]===b.dataset.csv}))}});
     [].forEach.call(document.querySelectorAll('[data-wa]'),function(b){b.onclick=function(){var w=wa[b.dataset.wa],n=((w.cfg.whatsapp)||'').replace(/\D/g,'');window.open('https://wa.me/'+(n.length===10?'91'+n:n)+'?text='+encodeURIComponent(w.txt),'_blank')}});
   })}

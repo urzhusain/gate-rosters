@@ -71,8 +71,8 @@ function dutyFlag_(g, c, all) {
     if (shiftStart_(p) === prev)
       return 'DOUBLE DUTY: ' + g.Name + ' was also on post in the previous ' + p.Shift + ' shift (' + p.Post + ', ' + String(p.Date).slice(5) + ' at ' + hm_(p.Time) + ') and is on post again in this ' + c.Shift + ' shift.';
   }
-  if (g.RegularShift && g.RegularShift !== c.Shift)
-    return 'SHIFT CHANGE: ' + g.Name + ' is registered for the ' + g.RegularShift + ' shift but is on the ' + c.Shift + ' shift now. He was not on post in the shift before, so this is not double duty. If this is his new shift, the Control Room should update it.';
+  if (g.Agency === 'Inhouse' && g.RegularShift && g.RegularShift !== c.Shift)
+    return 'SHIFT CHANGE: ' + g.Name + ' is registered for the ' + g.RegularShift + ' shift but is on the ' + c.Shift + ' shift now. He was not on post in the shift before, so this is not double duty. If we moved him, the Control Room should update his shift.';
   return '';
 }
 /** Run once from the editor: adds the new columns, creates the Alerts sheet, seeds each guard\'s shift and agency, repairs old flags. */
@@ -107,6 +107,15 @@ function repairFlags() {
   rows_('Guards').forEach(function (g) { gmap[g.ID] = g; });
   var iF = HEAD.Checks.indexOf('Flags') + 1, n = 0, all = rows_('Checks'), byG = {};
   all.forEach(function (c) { (byG[c.GuardId] = byG[c.GuardId] || []).push(c); });
+  /* Agency guards: their usual post and shift = where they were last seen on duty. */
+  var gsh = ss.getSheetByName('Guards'), iSh = HEAD.Guards.indexOf('RegularShift') + 1, iPo = HEAD.Guards.indexOf('RegularPost') + 1;
+  Object.keys(gmap).forEach(function (id) {
+    var g = gmap[id]; if (g.Agency === 'Inhouse') return;
+    var last = (byG[id] || []).filter(function (c) { return !isAbsent_(c.Presence); }).sort(function (x, y) { return ts_(x.Time) - ts_(y.Time); }).pop();
+    if (last && (g.RegularShift !== last.Shift || g.RegularPost !== last.Post)) {
+      gsh.getRange(g._row, iSh).setValue(last.Shift); gsh.getRange(g._row, iPo).setValue(last.Post); g.RegularShift = last.Shift; g.RegularPost = last.Post;
+    }
+  });
   all.forEach(function (c) {
     var parts = String(c.Flags || '').split(' | ').filter(function (x) { return x && x.indexOf('DOUBLE DUTY') !== 0 && x.indexOf('SHIFT CHANGE') !== 0; });
     var g = gmap[c.GuardId], df = g ? dutyFlag_(g, c, byG[c.GuardId] || []) : '';
@@ -462,6 +471,10 @@ function submitCheck_(q, by, role) {
     if (!seen) flags.push('NEW GUARD: first time on record. Ask his agency for his ID proof.');
     var df = dutyFlag_(guard, { Date: date, Shift: shift, Time: t, Presence: presence }, all);
     if (df) flags.push(df);
+    if (guard.Agency !== 'Inhouse' && (guard.RegularShift !== shift || guard.RegularPost !== post)) {
+      /* Agencies move their men between gates and shifts as they like; keep his usual post and shift up to date without a warning. */
+      setCells_('Guards', guard._row, { RegularPost: post, RegularShift: shift }); guard.RegularShift = shift; guard.RegularPost = post;
+    }
     if (!guard.RegularShift) flags.push('SHIFT NOT SET: this guard has no registered shift yet. Control Room should set it.');
   }
   if (type === 'Temporary' || type === 'Permanent') {
