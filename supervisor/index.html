@@ -113,7 +113,9 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
 function toast(m){var t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(function(){t.remove()},2600)}
 function newestFirst(r){try{if(r&&r.ok){var k=function(x){return String(x||'')};if(r.issues)r.issues.sort(function(a,b){return k(b.created).localeCompare(k(a.created))});if(r.checks)r.checks.sort(function(a,b){return k(b.time).localeCompare(k(a.time))});if(r.checkpoints)r.checkpoints.sort(function(a,b){return a.date===b.date?k(b.from).localeCompare(k(a.from)):k(b.date).localeCompare(k(a.date))})}}catch(e){}return r}
+var READ_ONLY={bootstrap:1,checks:1,issues:1,rounds:1,alerts:1,checkpoints:1};
 function call(action,data){
+  if(S.realRole&&S.role!==S.realRole&&!READ_ONLY[action])return Promise.resolve({ok:false,error:'View only: you are seeing the '+roleName()+' screens. Switch back to Head Office to make changes.'});
   if(!API)return Promise.resolve({ok:false,error:'The app is not connected yet. Setup is pending.'});
   var body=JSON.stringify(Object.assign({action:action,pin:S.pin,by:S.name},data||{}));
   return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}).then(function(r){return r.json()}).then(newestFirst).catch(function(){return {ok:false,error:'No connection. Check your internet and try again.'}});
@@ -243,11 +245,11 @@ function viewLogin(msg){
     S.pin=p;$('#lg').disabled=true;$('#lg').textContent='Checking…';
     call('bootstrap').then(function(r){
       if(!r.ok){S.pin='';viewLogin(r.error);return}
-      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.allposts=r.posts;S.posts=r.posts.filter(function(p){return p!=='Control Room'});S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;S.nightOff=r.nightOff||['Gate 2','Sarela Makan'];S.boardToken=r.boardToken||'';S.boardLinks=r.boardLinks||[];
+      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.realRole=r.role==='head'?'head':'';S.allposts=r.posts;S.posts=r.posts.filter(function(p){return p!=='Control Room'});S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;S.nightOff=r.nightOff||['Gate 2','Sarela Makan'];S.boardToken=r.boardToken||'';S.boardLinks=r.boardLinks||[];
       S.shift=defShift();S.tab=store('draft_raise')?'raise':'home';S.filter=r.role==='head'?'overdue':'open';
       main()})};
 }
-function logout(){S.pin='';S.role='';store('pin','');store('name','');viewLogin()}
+function logout(){S.pin='';S.role='';S.realRole='';store('pin','');store('name','');viewLogin()}
 
 /* ---------- shell ---------- */
 function tabsFor(){
@@ -258,9 +260,11 @@ function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:
 function main(){
   if(S.tab!=='issues')S.icat=null;
   var tabs=tabsFor();
-  $('#app').innerHTML='<div class="top"><div class="brand"><img src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><div><b>Security Control</b><small>'+(S.name===roleName()?esc(S.name):esc(S.name)+' · '+roleName())+'</small></div></div><span style="display:flex;gap:6px"><button id="odb">On duty</button><button id="lo">Sign out</button></span></div><main id="mn"></main>'+
+  $('#app').innerHTML='<div class="top"><div class="brand"><img src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><div><b>Security Control</b><small>'+(S.name===roleName()?esc(S.name):esc(S.name)+' · '+roleName())+'</small></div></div><span style="display:flex;gap:6px">'+(S.realRole?'<select id="vas" aria-label="View as" style="font:inherit;font-weight:700;border-radius:8px;padding:4px 6px"><option value="head">Head Office</option><option value="supervisor">View as Supervisor</option><option value="control">View as Control Room</option></select>':'')+'<button id="odb">On duty</button><button id="lo">Sign out</button></span></div>'+
+   (S.realRole&&S.role!==S.realRole?'<div style="background:#B45309;color:#fff;padding:7px 12px;font-weight:700;font-size:14px;text-align:center">Viewing as '+roleName()+' · view only, nothing can be changed or sent</div>':'')+'<main id="mn"></main>'+
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
   $('#lo').onclick=logout;$('#odb').onclick=openOnDuty;
+  if($('#vas')){$('#vas').value=S.role;$('#vas').onchange=function(){S.role=this.value;S.tab='home';S.issues=null;S.filter=S.role==='head'?'overdue':'open';main()}}
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
   var v={home:viewHome,review:viewReview,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster}[S.tab];$('#mn').classList.remove('wide');v();
 }
