@@ -552,9 +552,15 @@ function viewAgency(){
     if(st0>end){$('#ar').textContent='Scanning started on '+dShort(st0)+'. The report is available from tomorrow.';return}
     var days=dDays(st0,end),EX=(window.SUP_CONFIG||{}).expected||{},CFG=(window.SUP_CONFIG||{}).agencies||{},gm={};S.guards.forEach(function(g){gm[g.id]=g});
     var credit={},absent={},seenDays={},seenPost={},dbl={};
+    var cMin=function(c){var x=(String(c.time).match(/(\d+):(\d+)/)||[0,0,0]);return (+x[1])*60+ +x[2]},
+      sKey=function(c){var sh=c.shift||'Day',d=c.date;if(sh==='Night'&&cMin(c)<720)d=prevDay(d);return d+'|'+sh},
+      prevKey=function(k){var p=k.split('|');return p[1]==='Day'?prevDay(p[0])+'|Night':p[0]+'|Day'},byGk={};
+    rs[1].checks.forEach(function(c){if(c.guardId&&c.presence!=='Absent')(byGk[c.guardId]=byGk[c.guardId]||{})[sKey(c)+'|'+c.post]=1});
     rs[1].checks.forEach(function(c){
-      var g=gm[c.guardId],sh=c.shift||(g&&g.shift)||'Day',d=c.date,x=(String(c.time).match(/(\d+):(\d+)/)||[0,0,0]);
-      if(sh==='Night'&&(+x[1])*60+ +x[2]<720)d=prevDay(d);
+      var g=gm[c.guardId],k=sKey(c),m0=cMin(c),sh,d;
+      /* handover hour: a 8-9 PM (or 8-9 AM) scan of a man also seen in the shift before is the end of that earlier duty */
+      if(c.guardId&&((c.shift==='Night'&&m0>=1200&&m0<1260)||(c.shift==='Day'&&m0>=480&&m0<540))&&(byGk[c.guardId]||{})[prevKey(k)+'|'+c.post])k=prevKey(k);
+      d=k.split('|')[0];sh=k.split('|')[1];
       if(d>end||d<r0[0])return;
       if(c.presence==='Absent'){absent[c.post+'|'+sh+'|'+d]=1;return}
       if(!g)return;var ag=g.agency||'Sainik',k=c.post+'|'+sh+'|'+d+'|'+ag;

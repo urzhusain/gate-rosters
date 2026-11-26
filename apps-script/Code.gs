@@ -59,17 +59,32 @@ function shiftStart_(c) {
   if (c.Shift === 'Night') { if (x >= 0 && x < 720) d = dayBefore_(d); return ts_(d + ' 20:00:00'); }
   return ts_(d + ' 08:00:00');
 }
+/** Handover hour: day staff such as bouncers work 9 AM to 9 PM, and night staff often stay till 9 AM.
+ *  A scan in the first hour of a shift (8-9 PM night, 8-9 AM day) belongs to the PREVIOUS duty when the same man
+ *  was also seen at the same gate in that previous shift. Otherwise it is the start of the new shift. */
+function effStart_(c, all) {
+  var s = shiftStart_(c), x = clockMin_(c.Time);
+  var hand = (c.Shift === 'Night' && x >= 1200 && x < 1260) || (c.Shift === 'Day' && x >= 480 && x < 540);
+  if (!hand) return s;
+  var before = s - 12 * 3600 * 1000;
+  for (var i = 0; i < all.length; i++) {
+    var q = all[i];
+    if (q.GuardId === c.GuardId && q.Post === c.Post && q.Time !== c.Time && !isAbsent_(q.Presence) && shiftStart_(q) === before) return before;
+  }
+  return s;
+}
 function hm_(t) { return String(t).slice(11, 16).replace(/^(\d):/, '0$1:'); }
 /** Double duty = the guard was ALSO on post in the shift just before this one (night then day, or day then night).
  *  Working a different shift from his registered one, with the previous shift off, is only a shift change. */
 function dutyFlag_(g, c, all) {
   if (!g || isAbsent_(c.Presence)) return '';
-  var start = shiftStart_(c), prev = start - 12 * 3600 * 1000;
+  c.GuardId = c.GuardId || g.ID;
+  var start = effStart_(c, all), prev = start - 12 * 3600 * 1000;
   for (var i = all.length - 1; i >= 0; i--) {
     var p = all[i];
     if (p.GuardId !== g.ID || isAbsent_(p.Presence) || p.Time === c.Time) continue;
-    if (shiftStart_(p) === prev)
-      return 'DOUBLE DUTY: ' + g.Name + ' was also on post in the previous ' + p.Shift + ' shift (' + p.Post + ', ' + String(p.Date).slice(5) + ' at ' + hm_(p.Time) + ') and is on post again in this ' + c.Shift + ' shift.';
+    if (effStart_(p, all) === prev)
+      return 'DOUBLE DUTY: ' + g.Name + ' was also on post in the previous ' + (new Date(prev + 5.5 * 3600 * 1000).getUTCHours() === 8 ? 'Day' : 'Night') + ' shift (' + p.Post + ', ' + String(p.Date).slice(5) + ' at ' + hm_(p.Time) + ') and is on post again in this ' + c.Shift + ' shift.';
   }
   if (g.Agency === 'Inhouse' && g.RegularShift && g.RegularShift !== c.Shift)
     return 'SHIFT CHANGE: ' + g.Name + ' is registered for the ' + g.RegularShift + ' shift but is on the ' + c.Shift + ' shift now. He was not on post in the shift before, so this is not double duty. If we moved him, the Control Room should update his shift.';
