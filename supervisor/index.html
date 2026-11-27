@@ -284,8 +284,9 @@ function viewRound(){
     [].forEach.call(m.querySelectorAll('[data-p]'),function(b){b.onclick=function(){openCheck(b.dataset.p)}});
   });
 }
-function profileCard(){var p=((window.SUP_CONFIG||{}).profiles||{})[S.role];if(!p)return '';
-  return '<div class="card" style="flex-direction:row;align-items:center;gap:14px"><img src="'+esc(p.photo)+'" alt="'+esc(p.name)+'" style="width:72px;height:72px;border-radius:50%;object-fit:cover;flex:none;border:3px solid var(--gold)"><div style="min-width:0"><b style="font-size:17px">'+esc(p.name)+'</b><div class="muted" style="font-size:13px">'+esc(p.title||'')+'</div></div></div>'}
+function mgrProfile(n){var M=(window.SUP_CONFIG||{}).managers||{},k=Object.keys(M).filter(function(x){return x.toLowerCase()===String(n||'').trim().toLowerCase()})[0];return k?M[k]:null}
+function profileCard(){var p=S.role==='manager'?(mgrProfile(S.name)||{name:S.name,title:'Building Manager',photo:''}):((window.SUP_CONFIG||{}).profiles||{})[S.role];if(!p)return '';p=Object.assign({name:S.name},p);
+  return '<div class="card" style="flex-direction:row;align-items:center;gap:14px">'+(p.photo?'<img src="'+esc(p.photo)+'" alt="'+esc(p.name)+'" style="width:72px;height:72px;border-radius:50%;object-fit:cover;flex:none;border:3px solid var(--gold)">':'')+'<div style="min-width:0"><b style="font-size:17px">'+esc(p.name)+'</b><div class="muted" style="font-size:13px">'+esc(p.title||'')+'</div></div></div>'}
 function loadChecks(from,to){return call('checks',{from:from||ymd(0),to:to||from||ymd(0)}).then(function(r){if(r.ok)S.checks=r.checks;else toast(r.error);return r})}
 function modal(html){var d=document.createElement('div');d.className='modal';d.innerHTML='<div class="sheet">'+html+'</div>';d.onclick=function(e){if(e.target===d)d.remove()};document.body.appendChild(d);return d}
 function openCheck(post){
@@ -1118,9 +1119,9 @@ function viewHome(){
 var ROSTER_OF={'Gate 1':'g1','Gate 4':'g4','Gate 6 (Rabvat)':'g6','Gate 8 & 9':'g8','Mahad Gate':'m7','Masakin front gate':'mf','Masakin back gate':'mb','Raj Manzil':'rm','Yusufi Makan':'ys'};
 function viewMgrHome(){
   var m=$('#mn'),G=S.gates||[];
-  if(!G.length){m.innerHTML='<h2>My gates</h2><div class="card"><div class="muted">No gates are assigned to you yet. Please ask Head Office.</div></div>';return}
+  if(!G.length){m.innerHTML='<h2>My gates</h2>'+profileCard()+'<div class="card"><div class="muted">No gates are assigned to you yet. Please ask Head Office.</div></div>';return}
   var ids=G.map(function(g){return ROSTER_OF[g]}).filter(Boolean),noR=G.filter(function(g){return !ROSTER_OF[g]});
-  m.innerHTML='<h2>My gates</h2><div class="muted" style="font-size:13px">'+G.map(esc).join(' · ')+'</div><div id="mg" class="muted">Loading who is on duty…</div>'+
+  m.innerHTML='<h2>My gates</h2>'+profileCard()+'<div class="muted" style="font-size:13px">'+G.map(esc).join(' · ')+'</div><div id="mg" class="muted">Loading who is on duty…</div>'+
     '<div class="card"><div class="row" style="justify-content:space-between"><b>Instructions to the watchmen, today</b></div><div id="gi" class="muted">Loading instructions…</div>'+(noR.length?'<div class="muted" style="font-size:13px">No written instructions yet for: '+noR.map(esc).join(', ')+'.</div>':'')+'<div class="muted" style="font-size:13px">Instructions as of '+esc((window.ROSTER_CONFIG||{}).updated||'standard')+'</div></div>'+
     '<div class="card"><b>Something wrong at your gate?</b><div class="muted" style="font-size:13px">Send a complaint to the Control Room or to Head Office, with a photo.</div><button class="btn" data-tab-go="raise">Raise a complaint</button><button class="btn o" data-tab-go="issues">My complaints</button></div>';
   goBtns(m);
@@ -1156,7 +1157,7 @@ function renderManagers(){
   var taken={};L.forEach(function(x){if(x.active)x.gates.forEach(function(g){(taken[g]=taken[g]||[]).push(x.name)})});
   var free=(S.posts||[]).filter(function(p){return !taken[p]});
   box.className='';box.style.cssText='display:flex;flex-direction:column;gap:10px';
-  box.innerHTML=(L.length?L.map(function(x,i){return '<div class="card" style="padding:10px;'+(x.active?'':'opacity:.6')+'"><div class="row" style="justify-content:space-between"><b>'+esc(x.name)+'</b>'+(x.active?'':'<span class="chip">Login off</span>')+'</div>'+
+  box.innerHTML=(L.length?L.map(function(x,i){return '<div class="card" style="padding:10px;'+(x.active?'':'opacity:.6')+'"><div class="row" style="justify-content:space-between"><span style="display:flex;gap:10px;align-items:center">'+(mgrProfile(x.name)?'<img src="'+esc(mgrProfile(x.name).photo)+'" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)">':'')+'<span><b>'+esc(x.name)+'</b>'+(mgrProfile(x.name)?'<div class="muted" style="font-size:12px">'+esc(mgrProfile(x.name).title)+'</div>':'')+'</span></span>'+(x.active?'':'<span class="chip">Login off</span>')+'</div>'+
     '<div style="font-size:13px">'+(x.phone?phoneLinks(x.phone):'<span class="muted">no number</span>')+'</div>'+
     '<div>'+x.gates.map(function(g){return '<span class="chip" style="margin:2px 4px 2px 0">'+esc(g)+'</span>'}).join('')+'</div>'+
     '<div class="muted" style="font-size:13px">PIN: <span data-pin="'+i+'">••••••</span> <button class="btn o s" data-show="'+i+'" style="padding:2px 8px">Show</button></div>'+
