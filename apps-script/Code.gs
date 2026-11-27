@@ -254,6 +254,12 @@ function doPost(e) {
     if (!user) return json_({ ok: false, error: q.phone ? 'Wrong mobile number or password' : 'Wrong PIN' });
     var role = user.role, by = user.name;
     if (role === 'manager') return json_(managerAction_(q, user));
+    /* Head Office "View as Building Manager": read-only, sees exactly what that manager sees. */
+    if (role === 'head' && q.asManager && (q.action === 'myGates' || q.action === 'issues')) {
+      var mg = managersOut_().filter(function (x) { return x.name === String(q.asManager); })[0];
+      if (!mg) return json_({ ok: false, error: 'Manager not found' });
+      return json_(managerAction_(q, { name: mg.name, role: 'manager', gates: mg.gates }));
+    }
     switch (q.action) {
       case 'bootstrap': return json_(bootstrap_(role, by));
       case 'managers': return json_(role === 'head' ? { ok: true, managers: managersOut_() } : { ok: false, error: 'Only Head Office' });
