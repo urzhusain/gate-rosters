@@ -113,7 +113,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
 function toast(m){var t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(function(){t.remove()},2600)}
 function newestFirst(r){try{if(r&&r.ok){var k=function(x){return String(x||'')};if(r.issues)r.issues.sort(function(a,b){return k(b.created).localeCompare(k(a.created))});if(r.checks)r.checks.sort(function(a,b){return k(b.time).localeCompare(k(a.time))});if(r.checkpoints)r.checkpoints.sort(function(a,b){return a.date===b.date?k(b.from).localeCompare(k(a.from)):k(b.date).localeCompare(k(a.date))})}}catch(e){}return r}
-var READ_ONLY={bootstrap:1,checks:1,issues:1,rounds:1,alerts:1,checkpoints:1};
+var READ_ONLY={bootstrap:1,checks:1,issues:1,rounds:1,alerts:1,checkpoints:1,managers:1,myGates:1};
 function call(action,data){
   if(S.realRole&&S.role!==S.realRole&&!READ_ONLY[action])return Promise.resolve({ok:false,error:'View only: you are seeing the '+roleName()+' screens. Switch back to Head Office to make changes.'});
   if(!API)return Promise.resolve({ok:false,error:'The app is not connected yet. Setup is pending.'});
@@ -245,7 +245,7 @@ function viewLogin(msg){
     S.pin=p;$('#lg').disabled=true;$('#lg').textContent='Checking…';
     call('bootstrap').then(function(r){
       if(!r.ok){S.pin='';viewLogin(r.error);return}
-      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.realRole=r.role==='head'?'head':'';S.allposts=r.posts;S.posts=r.posts.filter(function(p){return p!=='Control Room'});S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;S.nightOff=r.nightOff||['Gate 2','Sarela Makan'];S.boardToken=r.boardToken||'';S.boardLinks=r.boardLinks||[];
+      store('pin',p);store('name',r.name);S.name=r.name;S.role=r.role;S.realRole=r.role==='head'?'head':'';S.allposts=r.posts;S.posts=r.posts.filter(function(p){return p!=='Control Room'});S.guards=r.guards;S.overdue=r.overdueHours;S.minCover=r.minCover;S.nightOff=r.nightOff||['Gate 2','Sarela Makan'];S.boardToken=r.boardToken||'';S.boardLinks=r.boardLinks||[];S.gates=r.gates||[];
       S.shift=defShift();S.tab=store('draft_raise')?'raise':'home';S.filter=r.role==='head'?'overdue':'open';
       main()})};
 }
@@ -254,19 +254,20 @@ function logout(){S.pin='';S.role='';S.realRole='';store('pin','');store('name',
 /* ---------- shell ---------- */
 function tabsFor(){
   if(S.role==='control')return [['home','🏠','Home'],['issues','📋','Issues'],['raise','📹','Camera'],['round','🚶','Round'],['report','📊','Report'],['roster','🗓️','Roster']];
-  if(S.role==='head')return [['home','🏠','Home'],['review','🔎','Review'],['issues','📋','Issues'],['report','📊','Report'],['roster','🗓️','Roster']];
+  if(S.role==='head')return [['home','🏠','Home'],['review','🔎','Review'],['issues','📋','Issues'],['report','📊','Report'],['managers','👥','Managers'],['roster','🗓️','Roster']];
+  if(S.role==='manager')return [['home','🏠','My gates'],['raise','➕','Complaint'],['issues','📋','My complaints']];
   return [['home','🏠','Home'],['round','🚶','Round'],['raise','➕','Raise'],['issues','📋','Issues'],['roster','🗓️','Roster']];}
-function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role]}
+function roleName(){return {supervisor:'Supervisor',control:'Control Room',head:'Head Office',manager:'Building Manager'}[S.role]}
 function main(){
   if(S.tab!=='issues')S.icat=null;
   var tabs=tabsFor();
-  $('#app').innerHTML='<div class="top"><div class="brand"><img src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><div><b>Security Control</b><small>'+(S.name===roleName()?esc(S.name):esc(S.name)+' · '+roleName())+'</small></div></div><span style="display:flex;gap:6px">'+(S.realRole?'<select id="vas" aria-label="View as" style="font:inherit;font-weight:700;border-radius:8px;padding:4px 6px"><option value="head">Head Office</option><option value="supervisor">View as Supervisor</option><option value="control">View as Control Room</option></select>':'')+'<button id="odb">On duty</button><button id="lo">Sign out</button></span></div>'+
+  $('#app').innerHTML='<div class="top"><div class="brand"><img src="../assets/logo-white.png" alt="Siyanat Al Mumtalakat"><div><b>Security Control</b><small>'+(S.name===roleName()?esc(S.name):esc(S.name)+' · '+roleName())+'</small></div></div><span style="display:flex;gap:6px">'+(S.realRole?'<select id="vas" aria-label="View as" style="font:inherit;font-weight:700;border-radius:8px;padding:4px 6px"><option value="head">Head Office</option><option value="supervisor">View as Supervisor</option><option value="control">View as Control Room</option></select>':'')+(S.role==='manager'?'':'<button id="odb">On duty</button>')+'<button id="lo">Sign out</button></span></div>'+
    (S.realRole&&S.role!==S.realRole?'<div style="background:#B45309;color:#fff;padding:7px 12px;font-weight:700;font-size:14px;text-align:center">Viewing as '+roleName()+' · view only, nothing can be changed or sent</div>':'')+'<main id="mn"></main>'+
    '<nav class="nav">'+tabs.map(function(t){return '<button data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</nav>';
-  $('#lo').onclick=logout;$('#odb').onclick=openOnDuty;
+  $('#lo').onclick=logout;if($('#odb'))$('#odb').onclick=openOnDuty;
   if($('#vas')){$('#vas').value=S.role;$('#vas').onchange=function(){S.role=this.value;S.tab='home';S.issues=null;S.filter=S.role==='head'?'overdue':'open';main()}}
   [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){S.tab=b.dataset.tab;main()}});
-  var v={home:viewHome,review:viewReview,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster}[S.tab];$('#mn').classList.remove('wide');v();
+  var v={home:viewHome,review:viewReview,issues:viewIssues,round:viewRound,raise:viewRaise,today:viewToday,report:viewReport,guards:viewGuards,roster:viewRoster,managers:viewManagers}[S.tab];$('#mn').classList.remove('wide');v();
 }
 
 /* ---------- round ---------- */
@@ -353,21 +354,22 @@ function openCheck(post){
 /* ---------- raise ---------- */
 function viewRaise(){
   var pf=S.prefill||{};S.prefill=null;if(!pf.description&&!pf.post){try{pf=JSON.parse(store('draft_raise')||'{}')||{}}catch(e){pf={}}}
-  var cam=S.role==='control';if(cam&&!pf.category)pf.category='Suspicious activity (seen on camera)';
-  $('#mn').innerHTML='<h2>'+(cam?'New report':'Raise an issue')+'</h2><div class="card">'+
-  '<div class="f"><label>Where?</label><select id="rp">'+S.allposts.concat(['Other / whole campus']).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
-  '<div class="f"><label>What kind?</label><select id="rc">'+CATS.filter(function(c){return (c!==INFOCAT||S.role==='head')&&(cam||S.role==='head'||c!==CAMCAT)}).map(function(c){return '<option'+(pf.category===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>'+
+  var cam=S.role==='control',mgr=S.role==='manager';if(cam&&!pf.category)pf.category='Suspicious activity (seen on camera)';
+  $('#mn').innerHTML='<h2>'+(cam?'New report':mgr?'Raise a complaint':'Raise an issue')+'</h2><div class="card">'+
+  '<div class="f"><label>Which gate?</label><select id="rp">'+(mgr?S.gates:S.allposts.concat(['Other / whole campus'])).map(function(p){return '<option'+(pf.post===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
+  '<div class="f"><label>What kind?</label><select id="rc">'+CATS.filter(function(c){return (c!==INFOCAT||S.role==='head')&&(cam||S.role==='head'||c!==CAMCAT)&&!(mgr&&(c===CAMCAT||c===INFOCAT))}).map(function(c){return '<option'+(pf.category===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>'+
   (cam?'<div class="f"><label>Send to</label><div class="seg" id="rto"><button data-to="head">Head Office</button><button data-to="supervisor">Supervisor</button></div></div>':'')+
+  (mgr?'<div class="f"><label>Send to</label><div class="seg" id="rto"><button data-to="control">Control Room</button><button data-to="head">Head Office</button></div></div>':'')+
   '<div class="f"><label>How urgent?</label><div class="seg" id="up"><button data-u="Normal" aria-pressed="true">Normal</button><button data-u="Urgent" aria-pressed="false">Urgent</button></div></div>'+
   (cam?'<div class="f"><label>Camera or exact spot (optional)</label><input id="rcam" placeholder="e.g. Camera 12, near Gate 4 parking"></div>':'')+
   '<div class="f"><label>Details</label><textarea id="rd">'+esc(pf.description||'')+'</textarea></div>'+
   '<div class="f"><label>Photo or screenshot</label><input id="rf" type="file" accept="image/*" capture="environment">'+(cam?'<input id="rf2" type="file" accept="image/*" style="display:none"><button type="button" class="btn o s" id="rfu" style="margin-top:6px">Upload a saved photo or screenshot instead</button>':'')+'</div><div class="err" id="re"></div>'+
   '<button class="btn" id="rs">'+(cam?'Save report':'Send to Control Room')+'</button></div>';
-  var urg=pf.urg==='Urgent'?'Urgent':'Normal',rto=pf.to==='supervisor'?'supervisor':'head';
-  function setTo(){[].forEach.call(document.querySelectorAll('[data-to]'),function(x){x.setAttribute('aria-pressed',x.dataset.to===rto)});if(cam)$('#rs').textContent='Send to '+WHO[rto]}
+  var urg=pf.urg==='Urgent'?'Urgent':'Normal',rto=mgr?(pf.to==='head'?'head':'control'):pf.to==='supervisor'?'supervisor':'head';
+  function setTo(){[].forEach.call(document.querySelectorAll('[data-to]'),function(x){x.setAttribute('aria-pressed',x.dataset.to===rto)});if(cam||mgr)$('#rs').textContent='Send to '+WHO[rto]}
   [].forEach.call(document.querySelectorAll('[data-to]'),function(b){b.onclick=function(){rto=b.dataset.to;setTo()}});setTo();
   [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.setAttribute('aria-pressed',b.dataset.u===urg)});
-  function saveDraft(){store('draft_raise',JSON.stringify({post:$('#rp').value,category:$('#rc').value,urg:urg,description:$('#rd').value}))}
+  function saveDraft(){store('draft_raise',JSON.stringify({post:$('#rp').value,category:$('#rc').value,urg:urg,to:rto,description:$('#rd').value}))}
   ['#rp','#rc','#rd'].forEach(function(q){$(q).addEventListener('input',saveDraft);$(q).addEventListener('change',saveDraft)});
   [].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.onclick=function(){urg=b.dataset.u;[].forEach.call(document.querySelectorAll('[data-u]'),function(x){x.setAttribute('aria-pressed',x===b)});saveDraft()}});
   function fullDesc(){var d=$('#rd').value.trim();if(!cam)return d;var c=($('#rcam')&&$('#rcam').value.trim())||'';return (c?'('+c+') ':'')+d}
@@ -376,12 +378,12 @@ function viewRaise(){
   $('#rs').onclick=function(){
     var b=this;b.disabled=true;b.textContent='Sending…';
     compress($('#rf').files[0]).then(function(img){window._ri=img;return call('raiseIssue',{to:rto,post:$('#rp').value,category:$('#rc').value,priority:urg,description:fullDesc(),photo:img})}).then(function(r){
-      b.disabled=false;b.textContent=cam?'Send to '+WHO[rto]:'Send to Control Room';
+      b.disabled=false;b.textContent=cam||mgr?'Send to '+WHO[rto]:'Send to Control Room';
       if(!r.ok){$('#re').textContent=r.error;return}
       S.issues=null;store('draft_raise','');
-      if(cam){toast(r.id+' sent to '+WHO[rto]);S.tab='issues';S.filter='open';main();return}
+      if(cam||(mgr&&rto==='head')){toast(r.id+' sent to '+WHO[rto]);S.tab='issues';S.filter='open';main();return}
       var CR=((window.SUP_CONFIG||{}).controlWhatsapp||'').replace(/\D/g,'');
-      var msg=(urg==='Urgent'?'URGENT - ':'')+'Issue '+r.id+'\n'+$('#rp').value+' - '+$('#rc').value+'\n'+($('#rd').value||'(no details)')+'\nRaised by '+S.name+(window._ri?'\n(photo is in the app)':'');
+      var msg=(urg==='Urgent'?'URGENT - ':'')+'Issue '+r.id+'\n'+$('#rp').value+' - '+$('#rc').value+'\n'+($('#rd').value||'(no details)')+'\nRaised by '+S.name+(mgr?' (Building Manager)':'')+(window._ri?'\n(photo is in the app)':'');
       var wa='https://wa.me/'+(CR.length===10?'91'+CR:CR)+'?text='+encodeURIComponent(msg);
       var d=modal('<h2>Issue '+esc(r.id)+' raised</h2><p>It is now in the Control Room list. Tap below to also alert the Control Room manager on WhatsApp.</p>'+
         '<a class="btn g" id="wa" href="'+wa+'" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;display:block">Send on WhatsApp</a>'+
@@ -395,11 +397,12 @@ function viewRaise(){
 function raiserOf(i){if(i.raisedRole)return i.raisedRole;var r=(i.log||[]).filter(function(l){return l.action==='Raised'})[0];return r?r.role:(i.category===CAMCAT?'control':'')}
 function fromCR(i){return raiserOf(i)==='control'}
 function toOf(i){return i.to||(fromCR(i)?'head':'control')}
-var WHO={head:'Head Office',control:'Control Room',supervisor:'Supervisor'};
+var WHO={head:'Head Office',control:'Control Room',supervisor:'Supervisor',manager:'Building Manager'};
 function isOverdue(i){return i.status!=='Solved'&&ageH(i.created)>=S.overdue}
 function viewIssues(){
   var m=$('#mn');
-  m.innerHTML='<h2>Issues</h2><div class="seg" id="fl"><button data-f="all">All</button><button data-f="overdue">Overdue</button><button data-f="new">Not acknowledged</button><button data-f="cr">Control Room → Head Office</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
+  var mg=S.role==='manager';if(mg&&['all','open','solved'].indexOf(S.filter)<0)S.filter='open';
+  m.innerHTML=mg?'<h2>My complaints</h2><div class="seg" id="fl"><button data-f="open">Open</button><button data-f="solved">Solved</button><button data-f="all">All</button></div><div id="il" class="muted">Loading…</div>':'<h2>Issues</h2><div class="seg" id="fl"><button data-f="all">All</button><button data-f="overdue">Overdue</button><button data-f="new">Not acknowledged</button><button data-f="cr">Control Room → Head Office</button><button data-f="open">Open</button><button data-f="solved">Solved</button></div><div id="il" class="muted">Loading…</div>';
   [].forEach.call(m.querySelectorAll('[data-f]'),function(b){b.setAttribute('aria-pressed',S.filter===b.dataset.f);b.onclick=function(){S.filter=b.dataset.f;renderIssues();[].forEach.call(m.querySelectorAll('[data-f]'),function(x){x.setAttribute('aria-pressed',S.filter===x.dataset.f)})}});
   var dd=S.idays||7;S.idays=null;S.iperiod=dd;
   call('issues',{days:dd}).then(function(r){if(!r.ok){$('#il').innerHTML='<span class="err">'+esc(r.error)+'</span>';return}S.issues=vis(r.issues);renderIssues()});
@@ -419,7 +422,7 @@ function statusChip(s,cat){if(cat===INFOCAT)return '<span class="chip '+({Open:'
 function issueCard(i){
   return '<button class="post" data-i="'+esc(i.id)+'" style="flex-direction:column;align-items:stretch"><span class="row" style="justify-content:space-between"><b>'+esc(i.id)+' · '+esc(i.post)+'</b>'+statusChip(i.status,i.category)+'</span>'+
    '<span>'+esc(i.category)+(i.priority==='Urgent'?' <span class="chip red">URGENT</span>':'')+(isOverdue(i)?' <span class="chip red">OVERDUE</span>':'')+'</span>'+
-   '<span class="muted">'+esc(i.description.slice(0,140))+'</span><small>'+esc(WHO[raiserOf(i)]||i.raisedBy)+' → '+esc(WHO[toOf(i)]||'')+' · '+ageTxt(i.created)+' ago'+(i.lastRemark?' · Last: '+esc(i.lastRemark.slice(0,60)):'')+'</small></button>';
+   '<span class="muted">'+esc(i.description.slice(0,140))+'</span><small>'+esc(raiserOf(i)==='manager'?i.raisedBy+' (Manager)':WHO[raiserOf(i)]||i.raisedBy)+' → '+esc(WHO[toOf(i)]||'')+' · '+ageTxt(i.created)+' ago'+(i.lastRemark?' · Last: '+esc(i.lastRemark.slice(0,60)):'')+'</small></button>';
 }
 function openIssue(id){
   var i=(S.issues||[]).filter(function(x){return x.id===id})[0];if(!i)return;
@@ -430,12 +433,13 @@ function openIssue(id){
     btns+='<div class="f" style="margin-top:8px"><label>Forward to agency</label><select id="ag">'+Object.keys(AG).map(function(k){return '<option value="'+esc(k)+'"'+((AG[k].posts||[]).indexOf(i.post)>=0?' selected':'')+'>'+esc(AG[k].name)+'</option>'}).join('')+'</select></div><button class="btn g" id="fw">Forward to agency on WhatsApp</button>'}
   var hCR=S.role==='head'&&toOf(i)==='head'&&i.status!=='Solved',sCR=S.role==='supervisor'&&toOf(i)==='supervisor'&&i.status!=='Solved';
   if(sCR){btns='<div class="row"><button class="btn o s" data-op="Acknowledged">Seen</button><button class="btn g s" data-op="Solved">Done</button></div>'}
+  if(S.role==='manager'){btns=i.status==='Solved'?'<button class="btn o" data-op="Reopened">Not solved, reopen</button>':''}
   if(S.role==='head'){btns=hCR?'<button class="btn g" data-op="Instruction">Reply with instruction</button><button class="btn o" data-op="Noted">Noted, close</button>':'<button class="btn r" data-op="Query">Ask Control Room: why not solved?</button>'+(i.status==='Solved'?'<button class="btn o" data-op="Reopened">Reopen</button>':'')}
   var d=modal('<h2>'+esc(i.id)+' · '+esc(i.post)+'</h2><div class="row">'+statusChip(i.status,i.category)+(i.priority==='Urgent'?'<span class="chip red">URGENT</span>':'')+'<span class="muted">'+esc(i.category)+' · '+ageTxt(i.created)+' old</span></div><div>'+esc(i.description)+'</div>'+
    (i.photo?'<a href="'+full(i.photo)+'" target="_blank" rel="noopener"><img class="th" alt="Issue photo" src="'+thumb(i.photo)+'"></a>':'')+
    '<div class="muted">Raised by '+esc(i.raisedBy)+' · for <b>'+esc(WHO[toOf(i)]||'')+'</b></div>'+
    (i.log&&i.log.length?'<div class="log">'+i.log.map(function(l){return '<div><b>'+esc(l.action)+'</b> · '+esc(l.by)+' ('+esc(l.role)+') · '+esc(l.time.slice(5,16))+(l.remark?'<br>'+esc(l.remark):'')+(l.photo?' <a href="'+full(l.photo)+'" target="_blank" rel="noopener">photo</a>':'')+'</div>'}).join('')+'</div>':'')+
-   '<div class="f"><label>Remark</label><textarea id="ur" placeholder="'+(sCR?'What did you do? (needed for Done)':hCR?'Your instruction or reply to the Control Room':S.role==='head'?'Your question to the Control Room':'What was done?')+'"></textarea></div><div class="f"><label>Photo (optional)</label><input id="uf" type="file" accept="image/*" capture="environment"></div><div class="err" id="ue"></div>'+btns+
+   '<div class="f"><label>Remark</label><textarea id="ur" placeholder="'+(sCR?'What did you do? (needed for Done)':hCR?'Your instruction or reply':S.role==='manager'?'Anything to add?':S.role==='head'?'Your question to the Control Room':'What was done?')+'"></textarea></div><div class="f"><label>Photo (optional)</label><input id="uf" type="file" accept="image/*" capture="environment"></div><div class="err" id="ue"></div>'+btns+
    '<button class="btn o s" data-op="Comment">Add comment only</button><button class="btn o" id="cl">Close</button>');
   $('#cl',d).onclick=function(){d.remove()};
   if($('#fw',d))$('#fw',d).onclick=function(){
@@ -646,7 +650,7 @@ function rosterCard(){
   t.notes.forEach(function(n){h+='<div class="flag" style="margin-top:2px"><b>NEW INSTRUCTION</b> ('+esc(n.gates)+'): '+esc(n.en)+'</div>'});
   if(!t.progs.length&&!t.notes.length)h+='<div class="muted">No special programs or new instructions today.</div>';
   return h+'<div id="gi" class="muted">Loading instructions for every gate…</div><div class="muted">Roster updated: '+esc(t.updated||'standard')+'</div></div>'}
-function fillGateInstr(){
+function fillGateInstr(only){
   var box=$('#gi');if(!box)return;
   var f=document.createElement('iframe');f.style.cssText='position:absolute;left:-9999px;width:800px;height:600px;border:0';f.setAttribute('aria-hidden','true');f.src='../index.html?v='+Date.now();
   var tries=0,tm=setInterval(function(){
@@ -655,7 +659,7 @@ function fillGateInstr(){
     if(ready){
       clearInterval(tm);
       try{
-        var pages=w.buildAll([new Date()],w.GATES.map(function(g){return g.id}),'day'),h='',seen={};
+        var pages=w.buildAll([new Date()],w.GATES.map(function(g){return g.id}).filter(function(id){return !only||only.indexOf(id)>-1}),'day'),h='',seen={};
         pages.forEach(function(pg){
           var key=pg.gate.name+pg.page.t1;if(seen[key])return;seen[key]=1;
           var inner='';
@@ -663,7 +667,7 @@ function fillGateInstr(){
             if(sc.kind==='tm'){var t=sc.t;inner+=t.ok?'<div><span class="chip">Gate 4</span> Entry closes <b>'+esc(t.entry)+'</b> · Exit opens <b>'+esc(t.exit)+'</b></div>':'<div class="muted">'+esc(t.noteEn||'')+'</div>';return}
             inner+='<div style="margin-top:8px"><div class="muted" style="font-weight:800;text-transform:uppercase;font-size:12px">'+esc(sc.t[0])+'</div>'+sc.items.map(function(x){var a=Array.isArray(x)?{en:x[0]}:x;return '<div style="'+(a.red?'color:var(--red);font-weight:700':'')+'">• '+esc(a.en)+'</div>'}).join('')+'</div>'});
           h+='<details style="border-top:1px solid var(--line);padding:8px 0"><summary style="font-weight:800;cursor:pointer">'+esc(pg.gate.name)+(pg.page.sub?' <span class="muted" style="font-weight:500">'+esc(pg.page.sub[0])+'</span>':'')+'</summary>'+inner+'</details>'});
-        box.className='';box.innerHTML='<div style="font-weight:800;margin-top:4px">Gate by gate, today</div>'+h;
+        box.className='';box.innerHTML=only?(h?h.replace(/<details /g,'<details open '):'<div class="muted">No written instructions for your gates yet.</div>'):'<div style="font-weight:800;margin-top:4px">Gate by gate, today</div>'+h;
       }catch(e){box.textContent='Open the Roster tab to see every gate.'}
       setTimeout(function(){f.remove()},50);
     }else if(tries>40){clearInterval(tm);box.textContent='Open the Roster tab to see every gate.';f.remove()}
@@ -1041,7 +1045,7 @@ function roundStats(list){
 function ntile(key,label,count,sub,tone,badge){return '<button type="button" class="nt '+(tone||'')+'" data-n="'+key+'">'+(badge?'<span class="nb">'+badge+'</span>':'')+'<span class="nl">'+esc(label)+'</span><span class="nc">'+count+'</span><span class="ns">'+esc(sub||'')+'</span></button>'}
 function listModal2(title,html){var d=modal('<h2>'+esc(title)+'</h2>'+html+'<button class="btn o" id="lx">Close</button>');$('#lx',d).onclick=function(){d.remove()};return d}
 function viewHome(){
-  var m=$('#mn');m.classList.remove('wide');if(S.role==='head'){viewHeadDash();return}
+  var m=$('#mn');m.classList.remove('wide');if(S.role==='head'){viewHeadDash();return}if(S.role==='manager'){viewMgrHome();return}
   m.innerHTML='<h2>'+({supervisor:'Supervisor',control:'Control Room',head:'Head Office'}[S.role])+' dashboard</h2><div id="hm" class="muted">Loading…</div>';
   var wk=S.role==='head'?[ymd(-6),ymd(0)]:null;
   var calls=[loadChecks(),call('issues')];if(wk)calls.push(call('checks',{from:wk[0],to:wk[1]}));else{calls.push(call('rounds',{days:2}));calls.push(call('alerts'));calls.push(call('checkpoints',{days:2}))}
@@ -1107,6 +1111,81 @@ function viewHome(){
     [].forEach.call(root.querySelectorAll('[data-n]'),function(b){b.onclick=function(){(NT[b.dataset.n]||function(){})()}});
     [].forEach.call(root.querySelectorAll('[data-chk]'),function(b){b.onclick=function(){S.shift=sh;openCheck(b.dataset.chk)}});
   });
+}
+
+/* ---------- Building manager ---------- */
+/* Which printed roster page belongs to which app gate. Gates not listed have no written roster yet. */
+var ROSTER_OF={'Gate 1':'g1','Gate 4':'g4','Gate 6 (Rabvat)':'g6','Gate 8 & 9':'g8','Mahad Gate':'m7','Masakin front gate':'mf','Masakin back gate':'mb','Raj Manzil':'rm','Yusufi Makan':'ys'};
+function viewMgrHome(){
+  var m=$('#mn'),G=S.gates||[];
+  if(!G.length){m.innerHTML='<h2>My gates</h2><div class="card"><div class="muted">No gates are assigned to you yet. Please ask Head Office.</div></div>';return}
+  var ids=G.map(function(g){return ROSTER_OF[g]}).filter(Boolean),noR=G.filter(function(g){return !ROSTER_OF[g]});
+  m.innerHTML='<h2>My gates</h2><div class="muted" style="font-size:13px">'+G.map(esc).join(' · ')+'</div><div id="mg" class="muted">Loading who is on duty…</div>'+
+    '<div class="card"><div class="row" style="justify-content:space-between"><b>Instructions to the watchmen, today</b></div><div id="gi" class="muted">Loading instructions…</div>'+(noR.length?'<div class="muted" style="font-size:13px">No written instructions yet for: '+noR.map(esc).join(', ')+'.</div>':'')+'<div class="muted" style="font-size:13px">Instructions as of '+esc((window.ROSTER_CONFIG||{}).updated||'standard')+'</div></div>'+
+    '<div class="card"><b>Something wrong at your gate?</b><div class="muted" style="font-size:13px">Send a complaint to the Control Room or to Head Office, with a photo.</div><button class="btn" data-tab-go="raise">Raise a complaint</button><button class="btn o" data-tab-go="issues">My complaints</button></div>';
+  goBtns(m);
+  if(ids.length)fillGateInstr(ids);else $('#gi').textContent='No written instructions for your gates yet.';
+  call('myGates').then(function(r){
+    var box=$('#mg');if(!box)return;
+    if(!r.ok){box.innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
+    box.className='';box.style.cssText='display:flex;flex-direction:column;gap:10px';
+    box.innerHTML='<div class="muted" style="font-size:13px"><b>'+esc(r.shift)+' shift</b> · updated '+esc(String(r.updated).slice(11,16))+'. Green = seen on post this shift by the supervisor or Control Room. Grey = not checked yet, so this is who is usually there.</div>'+
+     (r.gates||[]).map(function(o){return '<div class="card" style="padding:10px"><b>'+esc(o.post)+'</b>'+(o.guards.length?o.guards.map(function(g){
+       return '<div style="display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:8px">'+(g.photo?miniPh(g.photo,52):'<div style="width:52px;height:52px;border-radius:8px;background:var(--line)"></div>')+
+        '<div style="flex:1;min-width:0"><b>'+esc(g.name||'No name')+'</b>'+(g.agency?' <span class="muted" style="font-size:12px">· '+esc(g.agency==='Inhouse'?'In-house':g.agency)+'</span>':'')+'<div><span class="chip '+(g.seen?'grn':'')+'" style="font-size:11px">'+(g.seen?'Seen '+esc(g.seen):'Not checked yet · usually here')+'</span></div><div style="font-size:13px">'+phoneLinks(g.phone)+'</div></div>'+
+        '<button class="btn o s" data-cg="'+esc(o.post)+'" data-cn="'+esc(g.name)+'">Complain</button></div>'}).join(''):'<div class="muted">'+(o.moved?'The watchman seen here was moved to another gate.':'Nobody seen or on the roster for this shift.')+'</div>')+'</div>'}).join('')+
+     (S.nightOff&&r.shift==='Night'?G.filter(function(g){return S.nightOff.indexOf(g)>-1}).map(function(g){return '<div class="muted" style="font-size:13px">'+esc(g)+': no watchman at night.</div>'}).join(''):'');
+    [].forEach.call(box.querySelectorAll('[data-cg]'),function(b){b.onclick=function(){S.prefill={post:b.dataset.cg,category:'Complaint about guard',description:'Watchman: '+b.dataset.cn+'. '};S.tab='raise';main()}});
+  });
+}
+
+/* ---------- Head Office: building managers and their gates ---------- */
+function mgrLoginMsg(x){
+  return 'Salaam '+x.name+',\nYour login for Aljamea Security Control (Building Manager):\nhttps://urzhusain.github.io/gate-rosters/supervisor/\nYour PIN: '+x.pin+'\n\nYour gates: '+x.gates.join(', ')+'\nYou can see the watchmen on duty at your gates, their instructions, and send complaints to the Control Room or Head Office.\nPlease keep the PIN to yourself.'}
+function viewManagers(){
+  var m=$('#mn');m.innerHTML='<div class="row" style="justify-content:space-between"><h2>Building managers</h2><button class="btn s" id="mnew">+ Add manager</button></div><div class="muted" style="font-size:13px">Each manager signs in with his own PIN and sees only the gates ticked for him: who is on duty, the watchmen instructions, and his own complaints.</div><div id="ml" class="muted">Loading…</div>';
+  $('#mnew').onclick=function(){openManager(null)};
+  call('managers').then(function(r){
+    var box=$('#ml');if(!box)return;
+    if(!r.ok){box.innerHTML='<span class="err">'+esc(r.error)+'</span>';return}
+    S.managers=r.managers||[];renderManagers();
+  });
+}
+function renderManagers(){
+  var box=$('#ml'),L=S.managers||[];if(!box)return;
+  var taken={};L.forEach(function(x){if(x.active)x.gates.forEach(function(g){(taken[g]=taken[g]||[]).push(x.name)})});
+  var free=(S.posts||[]).filter(function(p){return !taken[p]});
+  box.className='';box.style.cssText='display:flex;flex-direction:column;gap:10px';
+  box.innerHTML=(L.length?L.map(function(x,i){return '<div class="card" style="padding:10px;'+(x.active?'':'opacity:.6')+'"><div class="row" style="justify-content:space-between"><b>'+esc(x.name)+'</b>'+(x.active?'':'<span class="chip">Login off</span>')+'</div>'+
+    '<div style="font-size:13px">'+(x.phone?phoneLinks(x.phone):'<span class="muted">no number</span>')+'</div>'+
+    '<div>'+x.gates.map(function(g){return '<span class="chip" style="margin:2px 4px 2px 0">'+esc(g)+'</span>'}).join('')+'</div>'+
+    '<div class="muted" style="font-size:13px">PIN: <span data-pin="'+i+'">••••••</span> <button class="btn o s" data-show="'+i+'" style="padding:2px 8px">Show</button></div>'+
+    '<div class="row"><button class="btn o s" data-ed="'+i+'">Edit gates</button>'+(x.active&&x.phone?'<button class="btn g s" data-wa="'+i+'">Send login on WhatsApp</button>':'')+'</div></div>'}).join(''):'<div class="card"><div class="muted">No building managers yet. Tap + Add manager.</div></div>')+
+    (free.length?'<div class="card" style="padding:10px"><b>Gates with no manager</b><div>'+free.map(function(g){return '<span class="chip yel" style="margin:2px 4px 2px 0">'+esc(g)+'</span>'}).join('')+'</div></div>':'');
+  [].forEach.call(box.querySelectorAll('[data-show]'),function(b){b.onclick=function(){var x=L[+b.dataset.show];box.querySelector('[data-pin="'+b.dataset.show+'"]').textContent=x.pin;b.remove()}});
+  [].forEach.call(box.querySelectorAll('[data-ed]'),function(b){b.onclick=function(){openManager(L[+b.dataset.ed])}});
+  [].forEach.call(box.querySelectorAll('[data-wa]'),function(b){b.onclick=function(){var x=L[+b.dataset.wa],n=String(x.phone).replace(/\D/g,'');window.open('https://wa.me/'+(n.length===10?'91'+n:n)+'?text='+encodeURIComponent(mgrLoginMsg(x)),'_blank','noopener')}});
+}
+function openManager(x){
+  var isNew=!x;x=x||{name:'',phone:'',gates:[],active:true};
+  var others={};(S.managers||[]).forEach(function(o){if(o!==x&&o.active)o.gates.forEach(function(g){(others[g]=others[g]||[]).push(o.name)})});
+  var d=modal('<h2>'+(isNew?'Add building manager':'Edit '+esc(x.name))+'</h2>'+
+    '<div class="f"><label>Full name</label><input id="mn1" value="'+esc(x.name)+'"></div>'+
+    '<div class="f"><label>WhatsApp number</label><input id="mp1" inputmode="tel" placeholder="10-digit mobile" value="'+esc(x.phone)+'"></div>'+
+    '<div class="f"><label>His gates</label><div style="display:flex;flex-direction:column;gap:6px">'+(S.posts||[]).map(function(p,i){return '<label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" data-gt="'+esc(p)+'"'+(x.gates.indexOf(p)>-1?' checked':'')+' style="width:20px;height:20px"> '+esc(p)+(others[p]?' <span class="muted" style="font-size:12px">(also '+esc(others[p].join(', '))+')</span>':'')+'</label>'}).join('')+'</div></div>'+
+    (isNew?'':'<div class="f"><label>Login</label><select id="ma1"><option value="Yes">On</option><option value="No">Off (cannot sign in)</option></select></div><label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="mpn" style="width:20px;height:20px"> Make a new PIN (the old one stops working)</label>')+
+    '<div class="err" id="me1"></div><button class="btn" id="ms1">'+(isNew?'Save and make PIN':'Save')+'</button><button class="btn o" id="mc1">Cancel</button>');
+  if($('#ma1',d))$('#ma1',d).value=x.active?'Yes':'No';
+  $('#mc1',d).onclick=function(){d.remove()};
+  $('#ms1',d).onclick=function(){
+    var b=this,gs=[].filter.call(d.querySelectorAll('[data-gt]'),function(c){return c.checked}).map(function(c){return c.dataset.gt});
+    var nm=$('#mn1',d).value.trim();if(nm.length<3){$('#me1',d).textContent='Enter the full name.';return}
+    if(!gs.length){$('#me1',d).textContent='Tick at least one gate.';return}
+    b.disabled=true;b.textContent='Saving…';
+    call('saveManager',{orig:isNew?'':x.name,name:nm,phone:$('#mp1',d).value,gates:gs,active:$('#ma1',d)?$('#ma1',d).value:'Yes',newPin:$('#mpn',d)?$('#mpn',d).checked:false}).then(function(r){
+      b.disabled=false;b.textContent='Save';if(!r.ok){$('#me1',d).textContent=r.error;return}
+      d.remove();S.managers=r.managers;renderManagers();toast(isNew?'Saved. PIN '+r.pin+' made.':'Saved');
+    })};
 }
 function viewRoster(){
   $('#mn').innerHTML='<div class="row" style="justify-content:space-between"><h2>Roster</h2><a class="btn o s" style="text-decoration:none" href="../" target="_blank" rel="noopener">Open full page</a></div><div class="muted">Pick days and gates, then Download PDF.</div><iframe src="../?v='+Date.now()+'" title="Gate rosters" style="width:100%;height:calc(100vh - 230px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe>';

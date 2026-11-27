@@ -1,7 +1,8 @@
 /**
  * Aljamea Security Control: backend.
  * Lives in a Google Sheet you own. Run setup() once, then deploy as a Web app.
- * Sheets: Posts, Guards, Checks, Issues, Log, Settings, Users (one row per person: Name, PIN, Role, Active). Photos go to a Drive folder.
+ * Sheets: Posts, Guards, Checks, Issues, Log, Settings, Users (one row per person: Name, PIN, Role, Active, Phone, Gates). Photos go to a Drive folder.
+ * Roles: supervisor, control, head, manager (a building manager: sees only his own gates, set in the Gates column, separated by |).
  */
 var TZ = 'Asia/Kolkata';
 var HEAD = {
@@ -11,7 +12,7 @@ var HEAD = {
   Issues: ['ID', 'Created', 'Post', 'Category', 'Priority', 'Description', 'PhotoId', 'RaisedBy', 'Status', 'LastRemark', 'Updated', 'SolvedAt', 'To'],
   Log: ['Time', 'IssueID', 'By', 'Role', 'Action', 'Remark', 'PhotoId'],
   Settings: ['Key', 'Value'],
-  Users: ['Name', 'PIN', 'Role', 'Active'],
+  Users: ['Name', 'PIN', 'Role', 'Active', 'Phone', 'Gates'],
   Alerts: ['Time', 'Type', 'Key', 'Level', 'Message', 'Audience'],
   Checkpoints: ['Time', 'Date', 'Id', 'Post', 'Result', 'Remark', 'PhotoId', 'By', 'Role']
 };
@@ -228,8 +229,8 @@ function userOf_(pin) {
   var us = rows_('Users');
   for (var i = 0; i < us.length; i++) {
     var u = us[i], role = String(u.Role || '').trim().toLowerCase();
-    if (String(u.PIN).trim() === pin && String(u.Active || 'Yes').trim().toLowerCase() !== 'no' && { supervisor: 1, control: 1, head: 1 }[role]) {
-      return { name: String(u.Name).trim(), role: role };
+    if (String(u.PIN).trim() === pin && String(u.Active || 'Yes').trim().toLowerCase() !== 'no' && { supervisor: 1, control: 1, head: 1, manager: 1 }[role]) {
+      return { name: String(u.Name).trim(), role: role, gates: role === 'manager' ? gatesOf_(u.Gates) : null };
     }
   }
   return null;
@@ -248,8 +249,11 @@ function doPost(e) {
     var user = userOf_(q.pin);
     if (!user) return json_({ ok: false, error: 'Wrong PIN' });
     var role = user.role, by = user.name;
+    if (role === 'manager') return json_(managerAction_(q, user));
     switch (q.action) {
       case 'bootstrap': return json_(bootstrap_(role, by));
+      case 'managers': return json_(role === 'head' ? { ok: true, managers: managersOut_() } : { ok: false, error: 'Only Head Office' });
+      case 'saveManager': return json_(saveManager_(q, role));
       case 'resetBoard': return json_(resetBoard_(role, q));
       case 'addGuard': return json_(addGuard_(q, by, role));
       case 'updateGuard': return json_(updateGuard_(q, by, role));
@@ -346,6 +350,12 @@ function boardReport_(q) {
 function board_(t) {
   var zone = zoneOfToken_(t);
   if (zone === null) return { ok: false, error: 'This link is not valid or has been reset.' };
+  var b = boardData_(ZONES[zone].posts);
+  b.zone = ZONES[zone].name; b.all = !ZONES[zone].posts; b.reportCats = REPORT_CATS;
+  return b;
+}
+/** Who is on duty now at the given gates (null = all gates). Used by the share links and the building manager login. */
+function boardData_(only) {
   var now = new Date(), nowS = now_(), h = Number(nowS.slice(11, 13)), shift = (h >= 8 && h < 20) ? 'Day' : 'Night';
   var startD = shift === 'Day' ? today_() : (h < 8 ? dateAdd_(today_(), -1) : today_());
   var start = ts_(startD + ' ' + (shift === 'Day' ? '08:00:00' : '20:00:00'));
@@ -361,7 +371,7 @@ function board_(t) {
   });
   checks.sort(function (a, b) { return a.Time < b.Time ? 1 : -1; });
   var posts = rows_('Posts').map(function (r) { return r.Post; }).filter(function (p) { return p && p !== 'Control Room'; });
-  if (ZONES[zone].posts) posts = posts.filter(function (p) { return ZONES[zone].posts.indexOf(p) > -1; });
+  if (only) posts = posts.filter(function (p) { return only.indexOf(p) > -1; });
   if (shift === 'Night') posts = posts.filter(function (p) { return NIGHT_OFF.indexOf(p) < 0; });
   var card = function (g, seen) { return { name: g.Name, phone: g.Phone, photo: g.PhotoId, agency: g.Agency, seen: seen || '' }; };
   /* Who is at a gate now = every guard seen there this shift (a gate can have several: gate guard, SO, agency supervisor).
@@ -383,7 +393,7 @@ function board_(t) {
     if (o.checked) return;
     guards.filter(function (g) { return g.RegularPost === o.post && g.RegularShift === shift && !shown[g.ID] && !lastAt[g.ID]; }).forEach(function (g) { o.guards.push(card(g, '')); });
   });
-  return { ok: true, shift: shift, updated: nowS, zone: ZONES[zone].name, all: !ZONES[zone].posts, reportCats: REPORT_CATS, gates: out };
+  return { ok: true, shift: shift, updated: nowS, gates: out };
 }
 /** Public: no PIN. Returns only name, photo, phone, gate, shift and agency of the one guard the link is for. */
 function card_(t) {
@@ -520,14 +530,14 @@ function raiseIssue_(q, by, role) {
   var desc = String(q.description || '').trim();
   if (desc.length < 3) return { ok: false, error: 'Write what the issue is' };
   issueToCol_();
-  var to = role === 'control' ? (q.to === 'supervisor' ? 'supervisor' : 'head') : 'control';
+  var to = role === 'control' ? (q.to === 'supervisor' ? 'supervisor' : 'head') : role === 'manager' ? (q.to === 'head' ? 'head' : 'control') : 'control';
   var n = rows_('Issues').length + 1, id = 'I-' + ('0000' + n).slice(-4), t = now_();
   add_('Issues', { To: to,
     ID: id, Created: t, Post: q.post || '', Category: q.category || 'Other', Priority: q.priority === 'Urgent' ? 'Urgent' : 'Normal',
     Description: desc.slice(0, 800), PhotoId: photo_(q.photo, 'issue_' + id), RaisedBy: by, Status: 'Open', LastRemark: '', Updated: t, SolvedAt: ''
   });
   add_('Log', { Time: t, IssueID: id, By: by, Role: role, Action: 'Raised', Remark: desc.slice(0, 200) });
-  addAlert_('issue', 'issue:' + id, q.priority === 'Urgent' ? 'high' : 'medium', (q.priority === 'Urgent' ? 'URGENT ' : '') + 'Issue ' + id + ' at ' + (q.post || '') + ': ' + (q.category || 'Other') + ' (raised by ' + by + ')', 'control,head');
+  addAlert_('issue', 'issue:' + id, q.priority === 'Urgent' ? 'high' : 'medium', (q.priority === 'Urgent' ? 'URGENT ' : '') + 'Issue ' + id + ' at ' + (q.post || '') + ': ' + (q.category || 'Other') + ' (raised by ' + by + ')', role === 'manager' && to === 'head' ? 'head' : 'control,head');
   return { ok: true, id: id, to: to };
 }
 /** Adds the To header to the Issues sheet once (issues raised before it existed have it blank). */
@@ -548,6 +558,9 @@ function listIssues_(role, q) {
   logs.forEach(function (l) { (byId[l.IssueID] = byId[l.IssueID] || []).push({ time: l.Time, by: l.By, role: l.Role, action: l.Action, remark: l.Remark, photo: l.PhotoId }); });
   var out = rows_('Issues').filter(function (r) {
     if (role === 'supervisor' && (toOf_(r, rr) === 'head' || (r.Category === PRIVATE_CAT && toOf_(r, rr) !== 'supervisor'))) return false;
+    /* A building manager sees only his own complaints. His complaints to Head Office are not shown to the Control Room. */
+    if (role === 'manager' && !(rr[r.ID] === 'manager' && r.RaisedBy === (q && q._by))) return false;
+    if (role === 'control' && rr[r.ID] === 'manager' && toOf_(r, rr) === 'head') return false;
     return r.Status !== 'Solved' || new Date((r.SolvedAt || r.Updated).replace(' ', 'T') + '+05:30').getTime() >= cutoff;
   }).map(function (r) {
     return { id: r.ID, created: r.Created, post: r.Post, category: r.Category, priority: r.Priority, description: r.Description,
@@ -562,19 +575,22 @@ function updateIssue_(q, by, role) {
   var allowed = {
     supervisor: ['Comment', 'Acknowledged', 'Solved'],
     control: ['Acknowledged', 'In progress', 'Solved', 'Reopened', 'Comment'],
-    head: ['Query', 'Reopened', 'Comment', 'Instruction', 'Noted']
+    head: ['Query', 'Reopened', 'Comment', 'Instruction', 'Noted'],
+    manager: ['Comment', 'Reopened']
   };
   if (allowed[role].indexOf(op) < 0) return { ok: false, error: 'Not allowed for your role' };
   if ((op === 'Solved' || op === 'Query' || op === 'Comment' || op === 'Instruction') && remark.length < 2) return { ok: false, error: 'Write a remark' };
   var rs = rows_('Issues'), is = null;
   for (var i = 0; i < rs.length; i++) if (rs[i].ID === q.id) is = rs[i];
   if (!is) return { ok: false, error: 'Issue not found' };
-  var to = toOf_(is, raisedRoles_(rows_('Log')));
+  var rrs = raisedRoles_(rows_('Log')), to = toOf_(is, rrs);
+  if (role === 'manager' && !(rrs[is.ID] === 'manager' && is.RaisedBy === by)) return { ok: false, error: 'Issue not found' };
+  if (role === 'control' && rrs[is.ID] === 'manager' && to === 'head') return { ok: false, error: 'Issue not found' };
   if (role === 'supervisor' && (to === 'head' || (is.Category === PRIVATE_CAT && to !== 'supervisor'))) return { ok: false, error: 'Issue not found' };
   if (role === 'supervisor' && op !== 'Comment' && to !== 'supervisor') return { ok: false, error: 'Only the Control Room can change this issue' };
   if (op === 'Instruction' || op === 'Noted') {
-    /* Head Office can reply to or close only reports the Control Room sent to Head Office. */
-    if (to !== 'head') return { ok: false, error: 'Only for reports the Control Room sent to Head Office' };
+    /* Head Office can reply to or close only reports sent to Head Office (by the Control Room or a building manager). */
+    if (to !== 'head') return { ok: false, error: 'Only for reports sent to Head Office' };
     if (is.Status === 'Solved') return { ok: false, error: 'Already closed' };
     if (op === 'Noted' && !remark) remark = 'Noted by Head Office';
   }
@@ -833,4 +849,62 @@ function alertsOut_(role) {
     return { time: a.Time, type: a.Type, level: a.Level, message: a.Message };
   }).reverse().slice(0, 60);
   return { ok: true, alerts: out };
+}
+
+/* ================= Building managers ================= */
+/** Gates column: post names separated by | (a comma also works when typed by hand). */
+function gatesOf_(v) { return String(v || '').split(/\s*[|,]\s*/).map(function (x) { return x.trim(); }).filter(String); }
+/** Adds the Phone and Gates headers to an older Users sheet once. */
+function usersCols_() {
+  var sh = ss_().getSheetByName('Users'), h = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(String);
+  ['Phone', 'Gates'].forEach(function (k) {
+    if (h.indexOf(k) < 0) { var c = h.filter(String).length + 1; sh.getRange(1, c).setValue(k).setFontWeight('bold').setBackground('#1F3A5F').setFontColor('#ffffff'); h[c - 1] = k; }
+  });
+  var o = {}; h.forEach(function (k, i) { if (k) o[k] = i + 1; }); return { sh: sh, col: o };
+}
+/** Everything a building manager can do: see his gates (who is on duty, the instructions), raise and follow his complaints. */
+function managerAction_(q, user) {
+  var gates = user.gates || [], by = user.name;
+  switch (q.action) {
+    case 'bootstrap':
+      return { ok: true, role: 'manager', name: by, gates: gates, posts: gates, guards: [], overdueHours: Number(settings_().overdue_hours) || 24, nightOff: NIGHT_OFF };
+    case 'myGates':
+      if (!gates.length) return { ok: true, shift: '', gates: [], none: true };
+      return boardData_(gates);
+    case 'raiseIssue':
+      if (gates.indexOf(String(q.post || '')) < 0) return { ok: false, error: 'Choose one of your gates' };
+      if (q.category === PRIVATE_CAT || q.category === 'Information (event notice)') q.category = 'Other';
+      return raiseIssue_(q, by, 'manager');
+    case 'issues': q._by = by; return listIssues_('manager', q);
+    case 'updateIssue': return updateIssue_(q, by, 'manager');
+    default: return { ok: false, error: 'Not allowed for a building manager' };
+  }
+}
+function managersOut_() {
+  usersCols_();
+  return rows_('Users').filter(function (u) { return String(u.Role).trim().toLowerCase() === 'manager'; }).map(function (u) {
+    return { name: String(u.Name).trim(), phone: u.Phone || '', gates: gatesOf_(u.Gates), active: String(u.Active || 'Yes').trim().toLowerCase() !== 'no', pin: String(u.PIN || '') };
+  });
+}
+function newPin_(used) { var p; do { p = String(100000 + Math.floor(Math.random() * 900000)); } while (used[p]); return p; }
+/** Head Office adds or edits a building manager: name, phone, gates, active. A new manager gets a new 6-digit PIN. */
+function saveManager_(q, role) {
+  if (role !== 'head') return { ok: false, error: 'Only Head Office can assign gates to managers' };
+  var U = usersCols_(), sh = U.sh, col = U.col, us = rows_('Users');
+  var name = String(q.name || '').trim().slice(0, 60), orig = String(q.orig || '').trim(), phone = String(q.phone || '').replace(/\D/g, '').slice(0, 13);
+  if (name.length < 3) return { ok: false, error: 'Enter the manager\'s full name' };
+  var posts = rows_('Posts').map(function (r) { return r.Post; }), gates = (q.gates || []).filter(function (g) { return posts.indexOf(g) > -1; });
+  if (!gates.length) return { ok: false, error: 'Tick at least one gate' };
+  var me = null, used = {};
+  us.forEach(function (u) {
+    used[String(u.PIN).trim()] = 1;
+    if (orig && String(u.Name).trim() === orig && String(u.Role).trim().toLowerCase() === 'manager') me = u;
+  });
+  if (orig && !me) return { ok: false, error: 'Manager not found' };
+  for (var i = 0; i < us.length; i++) if (us[i] !== me && String(us[i].Name).trim().toLowerCase() === name.toLowerCase()) return { ok: false, error: 'Someone with this name already has a login' };
+  var row = me ? me._row : sh.getLastRow() + 1, pin = me ? String(me.PIN) : newPin_(used);
+  if (me && q.newPin) pin = newPin_(used);
+  var vals = { Name: name, PIN: pin, Role: 'manager', Active: q.active === false || q.active === 'No' ? 'No' : 'Yes', Phone: phone, Gates: gates.join(' | ') };
+  Object.keys(vals).forEach(function (k) { if (col[k]) sh.getRange(row, col[k]).setNumberFormat('@').setValue(vals[k]); });
+  return { ok: true, managers: managersOut_(), pin: pin };
 }
