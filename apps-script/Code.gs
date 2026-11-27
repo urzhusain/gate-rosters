@@ -221,14 +221,18 @@ function photo_(dataUrl, prefix) {
   return f.getId();
 }
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
-function userOf_(pin) {
-  pin = String(pin || '').trim();
+/** Last 10 digits of a mobile number, so 98xxxxxxxx, +91 98xxxxxxxx and 091... all match. */
+function mob_(v) { return String(v || '').replace(/\D/g, '').slice(-10); }
+/** Building managers sign in with their mobile number + password (the PIN column). Everyone else signs in with the PIN only. */
+function userOf_(pin, phone) {
+  pin = String(pin || '').trim(); phone = mob_(phone);
   if (!pin) return null;
   var sh = ss_().getSheetByName('Users');
   if (!sh) return null;
   var us = rows_('Users');
   for (var i = 0; i < us.length; i++) {
     var u = us[i], role = String(u.Role || '').trim().toLowerCase();
+    if (role === 'manager' && (!phone || mob_(u.Phone) !== phone)) continue;
     if (String(u.PIN).trim() === pin && String(u.Active || 'Yes').trim().toLowerCase() !== 'no' && { supervisor: 1, control: 1, head: 1, manager: 1 }[role]) {
       return { name: String(u.Name).trim(), role: role, gates: role === 'manager' ? gatesOf_(u.Gates) : null };
     }
@@ -246,8 +250,8 @@ function doPost(e) {
     if (q.action === 'card') return json_(card_(q.t));
     if (q.action === 'board') return json_(board_(q.t));
     if (q.action === 'boardReport') return json_(boardReport_(q));
-    var user = userOf_(q.pin);
-    if (!user) return json_({ ok: false, error: 'Wrong PIN' });
+    var user = userOf_(q.pin, q.phone);
+    if (!user) return json_({ ok: false, error: q.phone ? 'Wrong mobile number or password' : 'Wrong PIN' });
     var role = user.role, by = user.name;
     if (role === 'manager') return json_(managerAction_(q, user));
     switch (q.action) {
@@ -893,6 +897,7 @@ function saveManager_(q, role) {
   var U = usersCols_(), sh = U.sh, col = U.col, us = rows_('Users');
   var name = String(q.name || '').trim().slice(0, 60), orig = String(q.orig || '').trim(), phone = String(q.phone || '').replace(/\D/g, '').slice(0, 13);
   if (name.length < 3) return { ok: false, error: 'Enter the manager\'s full name' };
+  if (mob_(phone).length !== 10) return { ok: false, error: 'Enter his 10-digit mobile number. It is his login ID.' };
   var posts = rows_('Posts').map(function (r) { return r.Post; }), gates = (q.gates || []).filter(function (g) { return posts.indexOf(g) > -1; });
   if (!gates.length) return { ok: false, error: 'Tick at least one gate' };
   var me = null, used = {};
@@ -901,7 +906,11 @@ function saveManager_(q, role) {
     if (orig && String(u.Name).trim() === orig && String(u.Role).trim().toLowerCase() === 'manager') me = u;
   });
   if (orig && !me) return { ok: false, error: 'Manager not found' };
-  for (var i = 0; i < us.length; i++) if (us[i] !== me && String(us[i].Name).trim().toLowerCase() === name.toLowerCase()) return { ok: false, error: 'Someone with this name already has a login' };
+  for (var i = 0; i < us.length; i++) {
+    if (us[i] === me) continue;
+    if (String(us[i].Name).trim().toLowerCase() === name.toLowerCase()) return { ok: false, error: 'Someone with this name already has a login' };
+    if (String(us[i].Role).trim().toLowerCase() === 'manager' && mob_(us[i].Phone) === mob_(phone)) return { ok: false, error: 'This mobile number is already the login of ' + us[i].Name };
+  }
   var row = me ? me._row : sh.getLastRow() + 1, pin = me ? String(me.PIN) : newPin_(used);
   if (me && q.newPin) pin = newPin_(used);
   var vals = { Name: name, PIN: pin, Role: 'manager', Active: q.active === false || q.active === 'No' ? 'No' : 'Yes', Phone: phone, Gates: gates.join(' | ') };
