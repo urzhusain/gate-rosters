@@ -1,6 +1,6 @@
 /* Gate Roster Desk: live settings. Claude updates this file when timings or instructions change. */
 window.ROSTER_CONFIG={
-updated:"26 Nov 2026, 12:35 PM",
+updated:"28 Nov 2026, 4:50 PM",
 g4Std:{
   1:["8:35 AM","3:30 PM","8:35","3:30"],2:["8:35 AM","3:30 PM","8:35","3:30"],3:["8:35 AM","3:30 PM","8:35","3:30"],4:["8:35 AM","3:30 PM","8:35","3:30"],
   5:["8:00 AM","3:30 PM","8:00","3:30"],6:["8:00 AM","1:45 PM","8:00","1:45"]
@@ -30,7 +30,11 @@ programs:[
   {gate:"g4",from:"2026-11-26",to:"2026-11-26",
    en:"EXIT: Darajah 11 talabat going to Qubba for gaseel (Raza granted)",gu:"બહાર જવું: દરજહ 11 ના તલબાત ગસીલ માટે કુબ્બા જશે (રઝા મળેલ છે)",
    time:["Time not given","સમય જણાવેલ નથી"],gateName:["Gate 4 (exit)","ગેટ 4 (બહાર જવા)"],
-   people:["32 talabat of Darajah 11","દરજહ 11 ના 32 તલબાત"],pass:["Allow exit only with their ID card. Check the ID card of each student.","ફક્ત ID કાર્ડ સાથે જ બહાર જવા દેવા. દરેક વિદ્યાર્થીનું ID કાર્ડ ચેક કરવું."],recv:null}
+   people:["32 talabat of Darajah 11","દરજહ 11 ના 32 તલબાત"],pass:["Allow exit only with their ID card. Check the ID card of each student.","ફક્ત ID કાર્ડ સાથે જ બહાર જવા દેવા. દરેક વિદ્યાર્થીનું ID કાર્ડ ચેક કરવું."],recv:null},
+  {gate:"g8",from:"2026-11-30",to:"2026-11-30",
+   en:"Saire Ilmi of Aljamea-tus-Saifiyah (Raza granted): MSB Mombasa",gu:"સૈરે ઇલ્મી, અલજામિયા-તુસ-સૈફિયા (રઝા મળેલ છે): MSB મોમ્બાસા",
+   time:["Arrival 2:00 PM","બપોરે 2:00 વાગ્યે આગમન"],gateName:["Gate 8 (opposite Kisvat collection)","ગેટ 8 (કિસ્વત કલેક્શનની સામે)"],
+   people:["10 students (farzando) of MSB Mombasa","MSB મોમ્બાસાના 10 વિદ્યાર્થીઓ (ફરઝંદો)"],pass:["Students carry their ID cards. Responsible person: Abdul Qadir bs Vajihi (+91 9106552818).","વિદ્યાર્થીઓ ID કાર્ડ સાથે લાવશે. જવાબદાર વ્યક્તિ: અબ્દુલ કાદિર બી.એસ. વાજીહી (+91 9106552818)."],recv:null}
 ],
 /* notes: gates is "all" or a list of ids: g1 g4 g6 g8 m7 mf mb rm ys */
 notes:[]
