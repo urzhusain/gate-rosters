@@ -152,6 +152,32 @@ img[decoding]{opacity:0;transition:opacity .35s}img[decoding].ld{opacity:1}
 .send:disabled{opacity:.5}
 .ferr{color:#FF3B30;font-size:14px;margin-top:8px;text-align:center;min-height:18px}
 .done{text-align:center;padding:30px 10px}.done .ok{width:72px;height:72px;border-radius:50%;background:var(--green);color:#fff;font-size:40px;display:grid;place-items:center;margin:0 auto 12px}
+/* tabs: On duty · Complaint · My complaints (like the building manager login) */
+body{padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:center;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep);padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
+.tabs button{flex:1;max-width:180px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--mute)}
+.tabs button span{font-size:22px;line-height:1}
+.tabs button.on{color:var(--blue)}
+.view{display:none}.view.on{display:block}
+.card2{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px}
+.card2 b{font-size:16px}
+.card2 .m2{color:var(--mute);font-size:13px}
+.ins details{border-top:.5px solid var(--sep);padding:8px 0}.ins details:first-child{border-top:0}
+.ins summary{font-weight:700;cursor:pointer}
+.ins .h{color:var(--mute);font-weight:700;text-transform:uppercase;font-size:12px;margin-top:8px}
+.ins .red{color:#FF3B30;font-weight:700}
+.fm select{width:100%;border:0;background:transparent;font:inherit;font-size:17px;color:var(--fg);outline:none;padding:2px 0;-webkit-appearance:none;appearance:none}
+.chip3{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--fill);color:var(--mute);white-space:nowrap}
+.chip3.open{background:rgba(255,149,0,.16);color:#C93400}.chip3.prog{background:rgba(0,122,255,.14);color:var(--blue)}.chip3.done{background:rgba(52,199,89,.15);color:#1E8E3E}.chip3.urg{background:rgba(255,59,48,.14);color:#FF3B30}
+.seg2{display:flex;background:var(--fill);border-radius:10px;padding:2px;margin:4px 0 8px}
+.seg2 button{flex:1;padding:7px 6px;border-radius:8px;font-size:14px;font-weight:600}
+.seg2 button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.lg{margin-top:10px;background:var(--card);border-radius:14px;padding:10px 14px;font-size:14px}
+.lg div+div{border-top:.5px solid var(--sep);margin-top:6px;padding-top:6px}
+.lg small{color:var(--mute)}
+.btn2{display:block;width:100%;margin-top:10px;background:var(--card);border-radius:14px;padding:13px;font-size:17px;font-weight:600;color:var(--blue);text-align:center;text-decoration:none}
+.btn2.g{background:#25D366;color:#fff}
+.vh{font-size:28px;font-weight:800;letter-spacing:-.01em;margin:6px 4px 4px}
 </style></head><body>
 <div class="bar" id="bar"><div class="tt">On Duty</div><div class="wrap"><div class="big">
   <div class="brand"><img src="../assets/icon-180.png" alt="">Aljamea-tus-Saifiyah · Security</div>
@@ -160,10 +186,17 @@ img[decoding]{opacity:0;transition:opacity .35s}img[decoding].ld{opacity:1}
   <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search gate or name" autocomplete="off"></label>
 </div></div>
 <main class="wrap">
+ <section class="view on" id="vDuty">
   <div class="sec">In charge</div><div class="staff" id="staff"></div>
   <div class="sec" id="gh">Gates</div><div class="grid" id="grid"><div class="empty">Loading…</div></div>
+  <div class="sec">Instructions to the watchmen, today</div><div class="card2 ins" id="gi"><span class="m2">Loading instructions…</span></div>
+  <div class="card2"><b>Something wrong at a gate?</b><div class="m2">Send a complaint to the Control Room or to Head Office, with a photo.</div><button class="send" data-go="raise">Raise a complaint</button><button class="btn2" data-go="mine">My complaints</button></div>
+  <footer style="margin-top:14px">Shared by the Aljamea security office. Green = seen on post this shift. Grey = gate not checked yet, showing who is usually there.</footer>
+ </section>
+ <section class="view" id="vRaise"></section>
+ <section class="view" id="vMine"></section>
 </main>
-<footer>Shared by the Aljamea security office. Green = seen on post this shift. Grey = gate not checked yet, showing who is usually there.</footer>
+<nav class="tabs" id="tabs"><button data-tab="duty" class="on"><span>🛡️</span>On duty</button><button data-tab="raise"><span>➕</span>Complaint</button><button data-tab="mine"><span>📋</span>My complaints</button></nav>
 <div class="scrim" id="scrim"></div><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
 <script src="config.js"></script>
 <script>
@@ -193,47 +226,105 @@ img[decoding]{opacity:0;transition:opacity .35s}img[decoding].ld{opacity:1}
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll()});
   function openGate(gi){var g=D.gates[gi];stack=[gi];
     open('<div class="shh"><h3>'+esc(g.post)+'</h3><button class="x" aria-label="Close">✕</button></div><div style="margin-bottom:10px">'+(g.checked?'<span class="stt ok">● Checked this shift</span>':'<span class="stt no">Not checked yet · usually here</span>')+'</div>'+
-      (g.guards.length?'<div class="list">'+g.guards.map(function(x,i){return '<button class="row" data-gi="'+gi+'" data-i="'+i+'">'+img(x.photo,200)+'<span class="t"><b>'+esc(x.name)+'</b><small>'+esc(x.agency||'')+(x.seen?' · seen '+esc(x.seen):'')+'</small></span><span class="chev">›</span></button>'}).join('')+'</div>':'<div class="empty">No watchman listed for this gate.</div>')+'<button class="rep" id="rpg">Report a problem at this gate</button>');
-    $('#rpg').onclick=function(){openReport(gi,null)};
+      (g.guards.length?'<div class="list">'+g.guards.map(function(x,i){return '<button class="row" data-gi="'+gi+'" data-i="'+i+'">'+img(x.photo,200)+'<span class="t"><b>'+esc(x.name)+'</b><small>'+esc(x.agency||'')+(x.seen?' · seen '+esc(x.seen):'')+'</small></span><span class="chev">›</span></button>'}).join('')+'</div>':'<div class="empty">No watchman listed for this gate.</div>')+'<button class="rep" id="rpg">Complaint about this gate</button>');
+    $('#rpg').onclick=function(){goRaise({post:g.post})};
     [].forEach.call($('#sheet').querySelectorAll('[data-i]'),function(b){b.onclick=function(){openGuard(+b.dataset.gi,+b.dataset.i)}})}
   function openGuard(gi,i){var g=D.gates[gi],x=g.guards[i];openCard({name:x.name,role:'Watchman · '+g.post,photo:x.photo,phone:x.phone,agency:x.agency,seen:x.seen,back:gi,gi:gi,guard:x.name})}
   function openCard(c){var n=num(c.phone);
     open('<div class="shh">'+(c.back!=null?'<button id="bk" style="color:var(--blue);font-size:17px">‹ '+esc(D.gates[c.back].post)+'</button>':'<span></span>')+'<button class="x" aria-label="Close">✕</button></div>'+
       '<div class="cc">'+(c.photoUrl?'<img alt="" src="'+esc(c.photoUrl)+'">':img(c.photo,600))+'<h3>'+esc(c.name)+'</h3><div class="m">'+esc(c.role)+(c.agency?' · '+esc(c.agency):'')+'</div>'+(c.seen!==undefined?'<div style="margin-top:10px">'+stt(c)+'</div>':'')+'</div>'+
-      (n?'<div class="acts"><a class="act" href="tel:+'+n+'">'+IC.call+'Call</a><a class="act" href="https://wa.me/'+n+'" target="_blank" rel="noopener">'+IC.wa+'WhatsApp</a></div><div class="num"><small>mobile</small><a href="tel:+'+n+'">+'+esc(n)+'</a></div>':'<div class="empty" style="padding:16px">No phone number saved.</div>'));
-    if(c.guard){$('#sheet').insertAdjacentHTML('beforeend','<button class="rep" id="rpw">Report a problem with this watchman</button>');$('#rpw').onclick=function(){openReport(c.gi,c.guard)}}
+      (n?'<div class="acts" style="grid-template-columns:1fr"><a class="act" href="tel:+'+n+'">'+IC.call+'Call</a></div><div class="num"><small>mobile</small><a href="tel:+'+n+'">+'+esc(n)+'</a></div>':'<div class="empty" style="padding:16px">No phone number saved.</div>'));
+    if(c.guard){$('#sheet').insertAdjacentHTML('beforeend','<button class="rep" id="rpw">Complaint about this watchman</button>');$('#rpw').onclick=function(){goRaise({post:D.gates[c.gi].post,guard:c.guard,category:'Complaint about guard'})}}
     var bk=$('#bk');if(bk)bk.onclick=function(){openGate(c.back)}}
   /* ---------- report a problem (name and photo required) ---------- */
   function shrink(file){return new Promise(function(res){if(!file)return res('');var u=URL.createObjectURL(file),im=new Image();im.onload=function(){var m=1000,k=Math.min(1,m/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*k);c.height=Math.round(im.naturalHeight*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.8))};im.onerror=function(){res('')};im.src=u})}
-  function openReport(gi,guard){
-    var g=D.gates[gi],cats=D.reportCats||['Guard sleeping / away from post','Guard absent','Uniform / dress','Complaint about guard','Other'];
-    var lab={'Guard sleeping / away from post':'Sleeping / away','Guard absent':'Not available','Uniform / dress':'Dress / uniform','Complaint about guard':'Complaint','Other':'Other'};
-    var me={};try{me=JSON.parse(localStorage.getItem('reporter')||'{}')}catch(e){}
-    open('<div class="shh"><button id="rbk" style="color:var(--blue);font-size:17px">‹ Back</button><button class="x" aria-label="Close">✕</button></div>'+
-      '<h3 style="margin:2px 0 2px;font-size:24px;font-weight:800">Report a problem</h3><div style="color:var(--mute);font-size:15px">'+esc(g.post)+(guard?' · '+esc(guard):'')+'</div>'+
-      '<div class="sec" style="margin:16px 4px 6px">What is the problem?</div><div class="chips2">'+cats.map(function(c,i){return '<button data-c="'+esc(c)+'"'+(i===0?' class="on"':'')+'>'+esc(lab[c]||c)+'</button>'}).join('')+'</div>'+
-      '<label class="shot" id="shl"><input id="rph" type="file" accept="image/*" capture="environment" hidden><span id="shi">📷</span><span id="sht">Take a photo (required)</span></label>'+
-      '<div class="fm"><label><small>Details (optional)</small><textarea id="rds" placeholder="What did you see?"></textarea></label></div>'+
+  /* ---------- tabs ---------- */
+  var TAB='duty',PF=null,MF='open',MI=null;
+  function tab(t){TAB=t;closeAll();[].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.classList.toggle('on',b.dataset.tab===t)});
+    ['duty','raise','mine'].forEach(function(k){$('#v'+{duty:'Duty',raise:'Raise',mine:'Mine'}[k]).classList.toggle('on',k===t)});
+    $('#bar').style.display=t==='duty'?'':'none';window.scrollTo(0,0);if(t==='raise')viewRaise();if(t==='mine')viewMine()}
+  [].forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){tab(b.dataset.tab)}});
+  [].forEach.call(document.querySelectorAll('[data-go]'),function(b){b.onclick=function(){tab(b.dataset.go)}});
+  function goRaise(p){PF=p;tab('raise')}
+  function post(body){return fetch(SUP_CONFIG.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({t:T},body))}).then(function(r){return r.json()})}
+  function me(){try{return JSON.parse(localStorage.getItem('reporter')||'{}')||{}}catch(e){return {}}}
+  var WHO={control:'Control Room',head:'Head Office'};
+  /* ---------- raise a complaint (same as the building manager form; name and photo needed, as the link has no login) ---------- */
+  function viewRaise(){
+    var v=$('#vRaise');if(!D){v.innerHTML='<div class="empty">Loading…</div>';return}
+    var p=PF||{};PF=null;var posts=D.posts||D.gates.map(function(g){return g.post}),cats=D.reportCats||['Other'],m=me(),to='control',urg=false;
+    v.innerHTML='<div class="vh">Raise a complaint</div>'+
+      '<div class="fm"><label><small>Which gate?</small><select id="rp">'+posts.map(function(x){return '<option'+(p.post===x?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></label>'+
+      '<label><small>What kind?</small><select id="rc">'+cats.map(function(c){return '<option'+(p.category===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></label></div>'+
+      '<div class="sec" style="margin:16px 4px 6px">Send to</div><div class="seg2" id="rto"><button data-to="control" class="on">Control Room</button><button data-to="head">Head Office</button></div>'+
       '<div class="urg"><span>Urgent</span><button class="sw" id="rug" aria-label="Urgent"></button></div>'+
-      '<div class="sec" style="margin:16px 4px 6px">Your details</div><div class="fm"><label><small>Your name (required)</small><input id="rnm" autocomplete="name" value="'+esc(me.name||'')+'"></label><label><small>Your phone (optional)</small><input id="rpn" inputmode="tel" autocomplete="tel" value="'+esc(me.phone||'')+'"></label></div>'+
-      '<div class="ferr" id="rer"></div><button class="send" id="rsd">Send to Control Room</button>');
-    var cat=cats[0],urg=false;
-    [].forEach.call($('#sheet').querySelectorAll('[data-c]'),function(b){b.onclick=function(){cat=b.dataset.c;[].forEach.call($('#sheet').querySelectorAll('[data-c]'),function(x){x.classList.toggle('on',x===b)})}});
+      '<div class="fm"><label><small>Details</small><textarea id="rds" placeholder="What did you see?">'+esc(p.guard?'Watchman: '+p.guard+'. ':'')+'</textarea></label></div>'+
+      '<label class="shot" id="shl"><input id="rph" type="file" accept="image/*" capture="environment" hidden><span id="shi">📷</span><span id="sht">Take a photo (required)</span></label>'+
+      '<div class="sec" style="margin:16px 4px 6px">Your details</div><div class="fm"><label><small>Your name (required)</small><input id="rnm" autocomplete="name" value="'+esc(m.name||'')+'"></label><label><small>Your phone (optional)</small><input id="rpn" inputmode="tel" autocomplete="tel" value="'+esc(m.phone||'')+'"></label></div>'+
+      '<div class="ferr" id="rer"></div><button class="send" id="rsd">Send to Control Room</button>';
+    [].forEach.call(v.querySelectorAll('[data-to]'),function(b){b.onclick=function(){to=b.dataset.to;[].forEach.call(v.querySelectorAll('[data-to]'),function(x){x.classList.toggle('on',x===b)});$('#rsd').textContent='Send to '+WHO[to]}});
     $('#rug').onclick=function(){urg=!urg;this.classList.toggle('on',urg)};
     $('#rph').onchange=function(){var f=this.files[0];if(!f)return;$('#shi').innerHTML='<img alt="" src="'+URL.createObjectURL(f)+'">';$('#sht').textContent='Photo added · tap to retake'};
-    $('#rbk').onclick=function(){guard?openGuard(gi,g.guards.map(function(x){return x.name}).indexOf(guard)):openGate(gi)};
-    $('#rsd').onclick=function(){var b=this,nm=$('#rnm').value.trim(),pn=$('#rpn').value.trim(),f=$('#rph').files[0];
+    $('#rsd').onclick=function(){var b=this,nm=$('#rnm').value.trim(),pn=$('#rpn').value.trim(),f=$('#rph').files[0],ps=$('#rp').value,ct=$('#rc').value,ds=$('#rds').value.trim();
+      if(ds.length<3&&ct==='Other'){$('#rer').textContent='Please write what the problem is.';return}
       if(!f){$('#rer').textContent='Please take a photo first.';return}
-      if(nm.length<3){$('#rer').textContent='Please write your name, so the Control Room knows who reported it.';return}
+      if(nm.length<3){$('#rer').textContent='Please write your name, so the Control Room knows who sent it.';return}
       try{localStorage.setItem('reporter',JSON.stringify({name:nm,phone:pn}))}catch(e){}
       b.disabled=true;b.textContent='Sending…';$('#rer').textContent='';
-      shrink(f).then(function(img){return fetch(SUP_CONFIG.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'boardReport',t:T,post:g.post,guard:guard||'',category:cat,priority:urg?'Urgent':'Normal',description:$('#rds').value,name:nm,phone:pn,photo:img})})}).then(function(r){return r.json()}).then(function(r){
-        if(!r.ok){b.disabled=false;b.textContent='Send to Control Room';$('#rer').textContent=r.error||'Could not send. Try again.';return}
-        open('<div class="shh"><span></span><button class="x" aria-label="Close">✕</button></div><div class="done"><div class="ok">✓</div><h3 style="margin:0 0 6px;font-size:22px">Sent to Control Room</h3><div style="color:var(--mute)">Report '+esc(r.id)+' · '+esc(g.post)+'<br>The Control Room has been alerted.</div></div>');
-      }).catch(function(){b.disabled=false;b.textContent='Send to Control Room';$('#rer').textContent='No connection. Try again.'})}
+      shrink(f).then(function(img){return post({action:'boardReport',to:to,post:ps,category:ct,priority:urg?'Urgent':'Normal',description:ds,name:nm,phone:pn,photo:img})}).then(function(r){
+        if(!r.ok){b.disabled=false;b.textContent='Send to '+WHO[to];$('#rer').textContent=r.error||'Could not send. Try again.';return}
+        var CR=String(cw||'').replace(/\D/g,''),msg=(urg?'URGENT - ':'')+'Complaint '+r.id+'\n'+ps+' - '+ct+'\n'+(ds||'(no details)')+'\nRaised by '+nm+' ('+(D.zone||'')+' link)\n(photo is in the app)';
+        v.innerHTML='<div class="done"><div class="ok">✓</div><h3 style="margin:0 0 6px;font-size:22px">Sent to '+WHO[to]+'</h3><div style="color:var(--mute)">Complaint '+esc(r.id)+' · '+esc(ps)+'<br>'+(to==='control'?'It is now in the Control Room list.':'Head Office will reply in the app.')+'</div></div>'+
+          (to==='control'&&CR?'<a class="btn2 g" href="https://wa.me/'+(CR.length===10?'91'+CR:CR)+'?text='+encodeURIComponent(msg)+'" target="_blank" rel="noopener">Also alert the Control Room on WhatsApp</a>':'')+
+          '<button class="btn2" data-go2="mine">See my complaints</button><button class="btn2" data-go2="duty">Back to On duty</button>';
+        [].forEach.call(v.querySelectorAll('[data-go2]'),function(x){x.onclick=function(){tab(x.dataset.go2)}});
+      }).catch(function(){b.disabled=false;b.textContent='Send to '+WHO[to];$('#rer').textContent='No connection. Try again.'})};
   }
+  /* ---------- my complaints: everything raised through this link ---------- */
+  function chip(st){var c={'Open':'open','Acknowledged':'prog','In progress':'prog','Solved':'done'}[st]||'';return '<span class="chip3 '+c+'">'+esc(st==='Solved'?'Solved':st)+'</span>'}
+  function age(t){var ms=Date.now()-new Date(String(t).replace(' ','T')+'+05:30').getTime(),h=Math.floor(ms/36e5);return h<1?Math.max(1,Math.floor(ms/6e4))+' min':h<48?h+' h':Math.floor(h/24)+' days'}
+  function who(r){return String(r||'').replace(/ · via .* link$/,'')}
+  function viewMine(){
+    var v=$('#vMine');v.innerHTML='<div class="vh">My complaints</div><div class="seg2" id="mf"><button data-f="open">Open</button><button data-f="solved">Solved</button><button data-f="all">All</button></div><div id="ml"><div class="empty">Loading…</div></div>';
+    [].forEach.call(v.querySelectorAll('[data-f]'),function(b){b.classList.toggle('on',b.dataset.f===MF);b.onclick=function(){MF=b.dataset.f;[].forEach.call(v.querySelectorAll('[data-f]'),function(x){x.classList.toggle('on',x===b)});listMine()}});
+    if(MI)listMine();
+    post({action:'boardIssues',days:30}).then(function(r){if(!r.ok){$('#ml').innerHTML='<div class="err">'+esc(r.error)+'</div>';return}MI=r.issues.slice().reverse();listMine()}).catch(function(){if(!MI)$('#ml').innerHTML='<div class="err">No connection. Try again.</div>'})}
+  function listMine(){var box=$('#ml');if(!box||!MI)return;
+    var L=MI.filter(function(i){return MF==='all'||(MF==='solved'?i.status==='Solved':i.status!=='Solved')});
+    box.innerHTML=L.length?'<div class="glist">'+L.map(function(i){return '<button class="gr" data-id="'+esc(i.id)+'"><span class="t"><b>'+esc(i.id)+' · '+esc(i.post)+'</b><small>'+esc(i.category)+' · to '+esc(WHO[i.to]||'')+' · '+age(i.created)+' ago'+(i.lastRemark?' · '+esc(i.lastRemark.slice(0,60)):'')+'</small></span><span class="r">'+(i.priority==='Urgent'?'<span class="chip3 urg">Urgent</span>':'')+chip(i.status)+'<span class="chev">›</span></span></button>'}).join('')+'</div>':'<div class="empty">'+(MF==='open'?'No open complaints.':'No complaints here yet.')+'</div>';
+    [].forEach.call(box.querySelectorAll('[data-id]'),function(b){b.onclick=function(){openIssue(b.dataset.id)}})}
+  function openIssue(id){var i=(MI||[]).filter(function(x){return x.id===id})[0];if(!i)return;var m=me();
+    open('<div class="shh"><h3>'+esc(i.id)+' · '+esc(i.post)+'</h3><button class="x" aria-label="Close">✕</button></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+chip(i.status)+(i.priority==='Urgent'?'<span class="chip3 urg">Urgent</span>':'')+'<span style="color:var(--mute);font-size:14px">'+esc(i.category)+' · '+age(i.created)+' old · to '+esc(WHO[i.to]||'')+'</span></div>'+
+      '<div class="card2">'+esc(i.description)+(i.photo?'<a href="https://drive.google.com/file/d/'+encodeURIComponent(i.photo)+'/view" target="_blank" rel="noopener"><img alt="" style="display:block;opacity:1;width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-top:8px" src="'+tu(i.photo,800)+'"></a>':'')+'<div class="m2" style="margin-top:6px">Sent by '+esc(who(i.raisedBy))+'</div></div>'+
+      (i.log&&i.log.length?'<div class="lg">'+i.log.map(function(l){return '<div><b>'+esc(l.action)+'</b> <small>· '+esc(l.role==='link'||l.role==='admin'?who(l.by):({control:'Control Room',head:'Head Office',supervisor:'Supervisor'}[l.role]||l.by))+' · '+esc(String(l.time).slice(5,16))+'</small>'+(l.remark&&l.action!=='Raised'?'<br>'+esc(l.remark):'')+'</div>'}).join('')+'</div>':'')+
+      '<div class="fm"><label><small>Remark</small><textarea id="ur" placeholder="Anything to add?"></textarea></label><label><small>Your name</small><input id="un" value="'+esc(m.name||'')+'"></label></div><div class="ferr" id="ue"></div>'+
+      (i.status==='Solved'?'<button class="send" data-op="Reopened" style="background:#FF9500">Not solved, reopen</button>':'')+'<button class="btn2" data-op="Comment">Add comment</button>');
+    [].forEach.call($('#sheet').querySelectorAll('[data-op]'),function(b){b.onclick=function(){var op=b.dataset.op,nm=$('#un').value.trim(),rm=$('#ur').value.trim();
+      if(nm.length<3){$('#ue').textContent='Please write your name.';return}
+      if(op==='Comment'&&rm.length<2){$('#ue').textContent='Write a remark.';return}
+      try{localStorage.setItem('reporter',JSON.stringify({name:nm,phone:me().phone||''}))}catch(e){}
+      b.disabled=true;post({action:'boardUpdate',id:i.id,op:op,remark:rm,name:nm}).then(function(r){b.disabled=false;if(!r.ok){$('#ue').textContent=r.error||'Could not save.';return}closeAll();viewMine()}).catch(function(){b.disabled=false;$('#ue').textContent='No connection. Try again.'})}})}
+  /* ---------- today's written instructions for this link's gates (from the printed roster) ---------- */
+  var ROSTER_OF={'Gate 1':'g1','Gate 4':'g4','Gate 6 (Rabvat)':'g6','Gate 8 & 9':'g8','Mahad Gate':'m7','Masakin front gate':'mf','Masakin back gate':'mb','Raj Manzil':'rm','Yusufi Makan':'ys'},insDone=false;
+  function fillInstr(){if(insDone||!D)return;insDone=true;var box=$('#gi'),ps=D.posts||D.gates.map(function(g){return g.post}),only=D.all?null:ps.map(function(p){return ROSTER_OF[p]}).filter(Boolean);
+    if(only&&!only.length){box.innerHTML='<span class="m2">No written instructions for these gates yet.</span>';return}
+    var f=document.createElement('iframe');f.style.cssText='position:absolute;left:-9999px;width:800px;height:600px;border:0';f.setAttribute('aria-hidden','true');f.src='../index.html?v='+Date.now();
+    var tries=0,tm=setInterval(function(){var w=f.contentWindow,ready=false;tries++;try{ready=!!(w&&w.GATES&&w.buildAll&&w.document.readyState!=='loading')}catch(e){}
+      if(ready){clearInterval(tm);try{
+        var pages=w.buildAll([new Date()],w.GATES.map(function(g){return g.id}).filter(function(id){return !only||only.indexOf(id)>-1}),'day'),h='',seen={};
+        pages.forEach(function(pg){var key=pg.gate.name+pg.page.t1;if(seen[key])return;seen[key]=1;var inner='';
+          pg.page.secs.forEach(function(sc){if(sc.kind==='tm'){var t=sc.t;inner+=t.ok?'<div>Gate 4: entry closes <b>'+esc(t.entry)+'</b> · exit opens <b>'+esc(t.exit)+'</b></div>':'<div class="m2">'+esc(t.noteEn||'')+'</div>';return}
+            inner+='<div class="h">'+esc(sc.t[0])+'</div>'+sc.items.map(function(x){var a=Array.isArray(x)?{en:x[0]}:x;return '<div'+(a.red?' class="red"':'')+'>• '+esc(a.en)+'</div>'}).join('')});
+          h+='<details'+(only?' open':'')+'><summary>'+esc(pg.gate.name)+(pg.page.sub?' <span class="m2" style="font-weight:500">'+esc(pg.page.sub[0])+'</span>':'')+'</summary>'+inner+'</details>'});
+        var noR=only?ps.filter(function(p){return !ROSTER_OF[p]}):[];
+        box.innerHTML=(h||'<span class="m2">No written instructions for these gates yet.</span>')+(noR.length?'<div class="m2" style="margin-top:6px">No written instructions yet for: '+noR.map(esc).join(', ')+'.</div>':'')+'<div class="m2" style="margin-top:6px">Instructions as of '+esc((w.ROSTER_CONFIG||{}).updated||'standard')+'</div>';
+      }catch(e){box.innerHTML='<span class="m2">Instructions could not be loaded.</span>'}setTimeout(function(){f.remove()},50)}
+      else if(tries>40){clearInterval(tm);box.innerHTML='<span class="m2">Instructions could not be loaded.</span>';f.remove()}},250);
+    document.body.appendChild(f)}
   /* render */
   function render(){
+    fillInstr();
     var q=($('#q').value||'').trim().toLowerCase(),gates=D.gates.map(function(g,i){return {g:g,i:i}}).filter(function(o){return !q||o.g.post.toLowerCase().indexOf(q)>-1||o.g.guards.some(function(x){return String(x.name).toLowerCase().indexOf(q)>-1})});
     $('#gh').textContent='Gates · '+D.gates.filter(function(g){return g.checked}).length+' of '+D.gates.length+' checked';
     if(phone.matches){

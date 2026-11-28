@@ -250,6 +250,8 @@ function doPost(e) {
     if (q.action === 'card') return json_(card_(q.t));
     if (q.action === 'board') return json_(board_(q.t));
     if (q.action === 'boardReport') return json_(boardReport_(q));
+    if (q.action === 'boardIssues') return json_(boardIssues_(q));
+    if (q.action === 'boardUpdate') return json_(boardUpdate_(q));
     var user = userOf_(q.pin, q.phone);
     if (!user) return json_({ ok: false, error: q.phone ? 'Wrong mobile number or password' : 'Wrong PIN' });
     var role = user.role, by = user.name;
@@ -316,7 +318,8 @@ function shareToken_(id) {
 /* Zones: a link that shows only some gates, for that area's in-charge. '' = all gates. */
 var ZONES = {
   '': { name: 'All gates', posts: null },
-  masakin: { name: 'Masakin Zone', posts: ['Masakin front gate', 'Masakin back gate', 'Raj Manzil', 'Yusufi Makan'] }
+  masakin: { name: 'Masakin Zone', posts: ['Masakin front gate', 'Masakin back gate', 'Raj Manzil', 'Yusufi Makan'] },
+  admin: { name: 'Admin Zone', posts: ['Gate 1', 'Gate 4', 'Gate 8 & 9'] }
 };
 function boardToken_(zone) {
   var k = 'board_token' + (zone ? '_' + zone : ''), t = settings_()[k];
@@ -338,30 +341,49 @@ function resetBoard_(role, q) {
   var t = Utilities.getUuid().replace(/-/g, '').slice(0, 20); setSetting_('board_token' + (z ? '_' + z : ''), t);
   return { ok: true, boardToken: t, boardLinks: boardLinks_() };
 }
-/** Public report from the shared board link: the person must give a name; a photo is required. */
-var REPORT_CATS = ['Guard sleeping / away from post', 'Guard absent', 'Uniform / dress', 'Complaint about guard', 'Other'];
+/** Shared link holders (zone in-charges) work like building managers: they raise complaints for their zone's gates to the
+    Control Room or Head Office and follow them. They have no login, so each complaint carries the name they give. */
+var REPORT_CATS = ['Guard absent', 'Guard sleeping / away from post', 'Uniform / dress', 'Complaint about guard', 'Security breach',
+  'Visitor or entry problem', 'Gate pass / material', 'Camera / equipment', 'Cleanliness / maintenance', 'Other'];
+function zonePosts_(z) { return ZONES[z].posts || requiredPosts_(); }
+function linkTag_(z) { return ' · via ' + ZONES[z].name + ' link'; }
 function boardReport_(q) {
   var z = zoneOfToken_(q.t);
   if (z === null) return { ok: false, error: 'This link is not valid or has been reset.' };
-  var posts = ZONES[z].posts, post = String(q.post || '');
-  if (posts && posts.indexOf(post) < 0) return { ok: false, error: 'This gate is not in your zone.' };
+  var post = String(q.post || '');
+  if (zonePosts_(z).indexOf(post) < 0) return { ok: false, error: 'This gate is not in your zone.' };
   var name = String(q.name || '').trim().slice(0, 60), ph = String(q.phone || '').replace(/\D/g, '').slice(0, 13);
   if (name.length < 3) return { ok: false, error: 'Please write your name.' };
-  if (!q.photo) return { ok: false, error: 'Please take a photo.' };
+  if (!q.photo) return { ok: false, error: 'Please add a photo.' };
   var cat = REPORT_CATS.indexOf(q.category) > -1 ? q.category : 'Other';
   var cache = CacheService.getScriptCache(), n = Number(cache.get('brep') || 0);
   if (n >= 30) return { ok: false, error: 'Too many reports in the last hour. Please call the Control Room.' };
   cache.put('brep', String(n + 1), 3600);
-  var who = name + (ph ? ' (' + ph + ')' : '') + ' · via ' + ZONES[z].name + ' link';
+  var who = name + (ph ? ' (' + ph + ')' : '') + linkTag_(z);
   var desc = (q.guard ? 'Watchman: ' + String(q.guard).slice(0, 60) + '. ' : '') + String(q.description || '').trim();
   if (desc.length < 3) desc = cat;
-  return raiseIssue_({ post: post, category: cat, priority: q.priority === 'Urgent' ? 'Urgent' : 'Normal', description: desc, photo: q.photo }, who, 'admin');
+  return raiseIssue_({ to: q.to === 'head' ? 'head' : 'control', post: post, category: cat, priority: q.priority === 'Urgent' ? 'Urgent' : 'Normal', description: desc, photo: q.photo }, who, 'link');
 }
+/** Complaints raised through this zone's link (everyone holding the link sees them). */
+function boardIssues_(q) {
+  var z = zoneOfToken_(q.t);
+  if (z === null) return { ok: false, error: 'This link is not valid or has been reset.' };
+  return listIssues_('link', { days: q.days || 30, _tag: linkTag_(z) });
+}
+function boardUpdate_(q) {
+  var z = zoneOfToken_(q.t);
+  if (z === null) return { ok: false, error: 'This link is not valid or has been reset.' };
+  var name = String(q.name || '').trim().slice(0, 60);
+  if (name.length < 3) return { ok: false, error: 'Please write your name.' };
+  q._tag = linkTag_(z);
+  return updateIssue_(q, name + linkTag_(z), 'link');
+}
+function linkOwns_(r, rr, tag) { var b = String(r.RaisedBy || ''); return (rr[r.ID] === 'link' || rr[r.ID] === 'admin') && !!tag && b.slice(-tag.length) === tag; }
 function board_(t) {
   var zone = zoneOfToken_(t);
   if (zone === null) return { ok: false, error: 'This link is not valid or has been reset.' };
   var b = boardData_(ZONES[zone].posts);
-  b.zone = ZONES[zone].name; b.all = !ZONES[zone].posts; b.reportCats = REPORT_CATS;
+  b.zone = ZONES[zone].name; b.all = !ZONES[zone].posts; b.reportCats = REPORT_CATS; b.posts = zonePosts_(zone);
   return b;
 }
 /** Who is on duty now at the given gates (null = all gates). Used by the share links and the building manager login. */
@@ -540,14 +562,14 @@ function raiseIssue_(q, by, role) {
   var desc = String(q.description || '').trim();
   if (desc.length < 3) return { ok: false, error: 'Write what the issue is' };
   issueToCol_();
-  var to = role === 'control' ? (q.to === 'supervisor' ? 'supervisor' : 'head') : role === 'manager' ? (q.to === 'head' ? 'head' : 'control') : 'control';
+  var to = role === 'control' ? (q.to === 'supervisor' ? 'supervisor' : 'head') : (role === 'manager' || role === 'link') ? (q.to === 'head' ? 'head' : 'control') : 'control';
   var n = rows_('Issues').length + 1, id = 'I-' + ('0000' + n).slice(-4), t = now_();
   add_('Issues', { To: to,
     ID: id, Created: t, Post: q.post || '', Category: q.category || 'Other', Priority: q.priority === 'Urgent' ? 'Urgent' : 'Normal',
     Description: desc.slice(0, 800), PhotoId: photo_(q.photo, 'issue_' + id), RaisedBy: by, Status: 'Open', LastRemark: '', Updated: t, SolvedAt: ''
   });
   add_('Log', { Time: t, IssueID: id, By: by, Role: role, Action: 'Raised', Remark: desc.slice(0, 200) });
-  addAlert_('issue', 'issue:' + id, q.priority === 'Urgent' ? 'high' : 'medium', (q.priority === 'Urgent' ? 'URGENT ' : '') + 'Issue ' + id + ' at ' + (q.post || '') + ': ' + (q.category || 'Other') + ' (raised by ' + by + ')', role === 'manager' && to === 'head' ? 'head' : 'control,head');
+  addAlert_('issue', 'issue:' + id, q.priority === 'Urgent' ? 'high' : 'medium', (q.priority === 'Urgent' ? 'URGENT ' : '') + 'Issue ' + id + ' at ' + (q.post || '') + ': ' + (q.category || 'Other') + ' (raised by ' + by + ')', (role === 'manager' || role === 'link') && to === 'head' ? 'head' : 'control,head');
   return { ok: true, id: id, to: to };
 }
 /** Adds the To header to the Issues sheet once (issues raised before it existed have it blank). */
@@ -570,7 +592,8 @@ function listIssues_(role, q) {
     if (role === 'supervisor' && (toOf_(r, rr) === 'head' || (r.Category === PRIVATE_CAT && toOf_(r, rr) !== 'supervisor'))) return false;
     /* A building manager sees only his own complaints. His complaints to Head Office are not shown to the Control Room. */
     if (role === 'manager' && !(rr[r.ID] === 'manager' && r.RaisedBy === (q && q._by))) return false;
-    if (role === 'control' && rr[r.ID] === 'manager' && toOf_(r, rr) === 'head') return false;
+    if (role === 'link' && !linkOwns_(r, rr, q && q._tag)) return false;
+    if (role === 'control' && (rr[r.ID] === 'manager' || rr[r.ID] === 'link') && toOf_(r, rr) === 'head') return false;
     return r.Status !== 'Solved' || new Date((r.SolvedAt || r.Updated).replace(' ', 'T') + '+05:30').getTime() >= cutoff;
   }).map(function (r) {
     return { id: r.ID, created: r.Created, post: r.Post, category: r.Category, priority: r.Priority, description: r.Description,
@@ -586,7 +609,8 @@ function updateIssue_(q, by, role) {
     supervisor: ['Comment', 'Acknowledged', 'Solved'],
     control: ['Acknowledged', 'In progress', 'Solved', 'Reopened', 'Comment'],
     head: ['Query', 'Reopened', 'Comment', 'Instruction', 'Noted'],
-    manager: ['Comment', 'Reopened']
+    manager: ['Comment', 'Reopened'],
+    link: ['Comment', 'Reopened']
   };
   if (allowed[role].indexOf(op) < 0) return { ok: false, error: 'Not allowed for your role' };
   if ((op === 'Solved' || op === 'Query' || op === 'Comment' || op === 'Instruction') && remark.length < 2) return { ok: false, error: 'Write a remark' };
@@ -595,7 +619,8 @@ function updateIssue_(q, by, role) {
   if (!is) return { ok: false, error: 'Issue not found' };
   var rrs = raisedRoles_(rows_('Log')), to = toOf_(is, rrs);
   if (role === 'manager' && !(rrs[is.ID] === 'manager' && is.RaisedBy === by)) return { ok: false, error: 'Issue not found' };
-  if (role === 'control' && rrs[is.ID] === 'manager' && to === 'head') return { ok: false, error: 'Issue not found' };
+  if (role === 'link' && !linkOwns_(is, rrs, q._tag)) return { ok: false, error: 'Issue not found' };
+  if (role === 'control' && (rrs[is.ID] === 'manager' || rrs[is.ID] === 'link') && to === 'head') return { ok: false, error: 'Issue not found' };
   if (role === 'supervisor' && (to === 'head' || (is.Category === PRIVATE_CAT && to !== 'supervisor'))) return { ok: false, error: 'Issue not found' };
   if (role === 'supervisor' && op !== 'Comment' && to !== 'supervisor') return { ok: false, error: 'Only the Control Room can change this issue' };
   if (op === 'Instruction' || op === 'Noted') {
